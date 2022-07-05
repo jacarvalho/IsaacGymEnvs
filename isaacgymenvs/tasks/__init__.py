@@ -31,6 +31,7 @@ from .ant import Ant
 from .anymal import Anymal
 from .anymal_terrain import AnymalTerrain
 from .ball_balance import BallBalance
+from .box2d_insertion import Box2DInsertion
 from .cartpole import Cartpole 
 from .factory.factory_task_gears import FactoryTaskGears
 from .factory.factory_task_insertion import FactoryTaskInsertion
@@ -68,4 +69,5 @@ isaacgym_task_map = {
     "Quadcopter": Quadcopter,
     "ShadowHand": ShadowHand,
     "Trifinger": Trifinger,
+    "Box2DInsertion": Box2DInsertion
 }
