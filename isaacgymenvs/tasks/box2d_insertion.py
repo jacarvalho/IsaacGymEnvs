@@ -52,7 +52,8 @@ def orientation_error(desired, current):
 
 class Box2DInsertion_OLD(VecTask):
 
-    def __init__(self, cfg, sim_device, graphics_device_id, headless):
+    def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+
         self.cfg = cfg
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
@@ -107,7 +108,8 @@ class Box2DInsertion_OLD(VecTask):
                 extra_actions += 4 + 1  # parameters of Dpos and Dorn
             self.cfg["env"]["numActions"] = 3 + extra_actions
 
-        super().__init__(config=self.cfg, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless)
+        super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
+
 
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
@@ -422,8 +424,8 @@ def compute_box2d_insertion_reward(
     return reward, reset
 
 class Box2DInsertion(Box2DInsertion_OLD):
-    def __init__(self, cfg, sim_device, graphics_device_id, headless):
-        super(Box2DInsertion, self).__init__(cfg, sim_device, graphics_device_id, headless)
+    def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+        super(Box2DInsertion, self).__init__(cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render)
 
         print(".----------------------------", self.cfg["env"]["enableSparseReward"])
         self.enable_sparse_reward = self.cfg["env"]["enableSparseReward"]
