@@ -34,7 +34,6 @@ import xml.etree.ElementTree as ET
 from typing import *
 
 from pytorch3d.transforms import quaternion_multiply, axis_angle_to_quaternion
-from pytorch3d.transforms import quaternion_to_matrix, matrix_to_euler_angles, euler_angles_to_matrix, matrix_to_quaternion
 
 from isaacgym import gymutil, gymtorch, gymapi
 from isaacgym.torch_utils import *
@@ -80,9 +79,9 @@ class Box2DInsertion(VecTask):
             # 0:3 - box position
             # 3:6 - box linear velocity
             if not self.enable_velocities_states:
-                self.cfg["env"]["numObservations"] = 2
+                self.cfg["env"]["numObservations"] = 3
             else:
-                self.cfg["env"]["numObservations"] = 2 + 2
+                self.cfg["env"]["numObservations"] = 3 + 3
         else:
             # With rotations
             # 0:3 - box position
@@ -90,9 +89,9 @@ class Box2DInsertion(VecTask):
             # 7:10 - box linear velocity
             # 10:13 - box angular velocity
             if not self.enable_velocities_states:
-                self.cfg["env"]["numObservations"] = 2 + 2
+                self.cfg["env"]["numObservations"] = 3 + 4
             else:
-                self.cfg["env"]["numObservations"] = 2 + 2 + 2 + 2
+                self.cfg["env"]["numObservations"] = 3 + 4 + 3 + 3
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
@@ -103,12 +102,11 @@ class Box2DInsertion(VecTask):
                 extra_actions += 4  # parameters of Dpos
             self.cfg["env"]["numActions"] = 2 + extra_actions
         else:
-            extra_actions += 1
             if self.learn_stiffness:
                 extra_actions += 4 + 1  # parameters of Kpos and Korn
             if self.learn_damping:
                 extra_actions += 4 + 1  # parameters of Dpos and Dorn
-            self.cfg["env"]["numActions"] = 2 + extra_actions
+            self.cfg["env"]["numActions"] = 3 + extra_actions
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
 
@@ -127,7 +125,7 @@ class Box2DInsertion(VecTask):
         # Default IC stiffness and damping
         # 2 prismatic joints + 1 revolute joint
         self.kp = torch.zeros((self.num_envs, 3, 6 if self.enable_orientations else 3), device=self.device)
-        self.kp_pos_factor = 10. if self.control_vel else 50.
+        self.kp_pos_factor = 5. if self.control_vel else 50.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
             self.kp_orn_factor = 10. if self.control_vel and self.learn_orientations else 50.
@@ -138,10 +136,10 @@ class Box2DInsertion(VecTask):
         else:
             self.kv = 2 * torch.sqrt(self.kp)
         self.kv_pos_factor = 5. if self.control_vel else 50.
-        self.kv_orn_factor = 5. if self.control_vel and self.learn_orientations else 50.
+        self.kv_orn_factor = 10. if self.control_vel and self.learn_orientations else 50.
 
         self.enable_sparse_reward = self.cfg["env"]["enableSparseReward"]
-        self.initial_position_bounds = self.cfg["env"].get("initialPositionBounds", [[-1, -1], [1, 1]])
+        self.initial_position_bounds = self.cfg["env"].get("initialPositionBounds", [[-1, -1], [1, 1]]) #TODO make 3d
 
         self.use_init_states = self.cfg["env"].get('useInitStates', 'False')
         if self.use_init_states:
@@ -243,36 +241,22 @@ class Box2DInsertion(VecTask):
             self.box_rb_idxs.append(rb_idx)
 
     def compute_observations(self, env_ids=None):
+        #TODO what does mSVF need as input?
+        #TODO also add -q for value etc @Joao?
         if env_ids is None:
             env_ids = np.arange(self.num_envs)
 
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-        # 3-dimensional data
-        box_positions = self.rb_state[self.box_rb_idxs][:, 0:3]
-        box_orientation = self.rb_state[self.box_rb_idxs][:, 3:7]
-        box_linear_velocity = self.rb_state[self.box_rb_idxs][:, 7:10]
-        box_angluar_velocity = self.rb_state[self.box_rb_idxs][:, 10:13]
-
-        # convert to 2-dimensional observations
-        self.obs_buf[env_ids, 0:2] = box_positions[:, 0:2]
+        self.obs_buf[env_ids, 0:3] = self.rb_state[self.box_rb_idxs][:, 0:3]  # box positions
         if not self.enable_orientations:
             if self.enable_velocities_states:
-                self.obs_buf[env_ids, 2:4] = box_linear_velocity[:, 0:2]
+                self.obs_buf[env_ids, 3:6] = self.rb_state[self.box_rb_idxs][:, 7:10]  # box linear velocity
         else:
-            # get angle around z-axis which is yaw
-            roll, pitch, yaw = get_euler_xyz(box_orientation)
-
-            # convert angle to polar coordinates
-            cos_theta = torch.cos(yaw)
-            sin_theta = torch.sin(yaw)
-            theta = torch.cat((cos_theta.unsqueeze(1), sin_theta.unsqueeze(1)), dim=1)
-
-            self.obs_buf[env_ids, 2:4] = theta[env_ids, :]  # box z-axis orientation in polar coordinates
+            self.obs_buf[env_ids, 3:7] = self.rb_state[self.box_rb_idxs][:, 3:7]  # box orientation
             if self.enable_velocities_states:
-                self.obs_buf[env_ids, 4:6] = box_linear_velocity[:, 0:2] # box linear velocity
-                self.obs_buf[env_ids, 6:8] = box_angluar_velocity[:, 0:2]  # box angular velocity
+                self.obs_buf[env_ids, 10:13] = self.rb_state[self.box_rb_idxs][:, 10:13]  # box angular velocity
 
         return self.obs_buf
 
@@ -394,7 +378,7 @@ class Box2DInsertion(VecTask):
             # orientations / angular velocities
             if self.enable_orientations:
                 if not self.learn_orientations:
-                    # Orientation is not part of the policy output. The desired orientation is set to the final one.
+                    # Orientation is not part of the policy output. The desired oritentation is set to the final one.
                     # control the angle
                     box_orn_des = torch.zeros_like(box_orn_cur)
                     box_orn_des[..., 3] = 1.  # no rotation wrt the base
@@ -479,12 +463,11 @@ def compute_box2d_insertion_reward(
 
     box_orn_dist = torch.zeros_like(box_pos_dist)
     if enable_orientations:
-        box_orientations = box_state_buf[..., 2:4]
-        #Todo which distance?
-        #box_orn_dist = distance_orientation(desired, box_orientations)
-        #reward -= box_orn_dist
-        box_orn_dist = torch.atan2(box_orientations[:, 1], box_orientations[:, 0])
-        reward -= box_orientations.sum(-1)**2
+        box_orientations = box_state_buf[..., 3:7]
+        desired = torch.zeros_like(box_orientations)
+        desired[..., 3] = 1.  # no rotation wrt base
+        box_orn_dist = distance_orientation(desired, box_orientations)
+        reward -= box_orn_dist
 
     condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.005)
     if enable_orientations:
