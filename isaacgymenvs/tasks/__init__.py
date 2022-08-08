@@ -32,7 +32,7 @@ from .anymal import Anymal
 from .anymal_terrain import AnymalTerrain
 from .ball_balance import BallBalance
 from .box2d_insertion import Box2DInsertion
-from .box3d_insertion_f import FrankaBox3DInsertion
+from .box3d_insertion_franka import FrankaBox3DInsertion
 from .box3d_insertion import Box3DInsertion
 from .cartpole import Cartpole 
 from .factory.factory_task_gears import FactoryTaskGears
