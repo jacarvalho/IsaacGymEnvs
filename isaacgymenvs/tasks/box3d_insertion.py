@@ -50,7 +50,7 @@ def orientation_error(desired, current):
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
 
-class Box2DInsertion(VecTask):
+class Box3DInsertion(VecTask):
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
 
@@ -100,13 +100,13 @@ class Box2DInsertion(VecTask):
                 extra_actions += 4  # parameters of Kpos
             if self.learn_damping:
                 extra_actions += 4  # parameters of Dpos
-            self.cfg["env"]["numActions"] = 2 + extra_actions
+            self.cfg["env"]["numActions"] = 3 + extra_actions
         else:
             if self.learn_stiffness:
                 extra_actions += 4 + 1  # parameters of Kpos and Korn
             if self.learn_damping:
                 extra_actions += 4 + 1  # parameters of Dpos and Dorn
-            self.cfg["env"]["numActions"] = 3 + extra_actions
+            self.cfg["env"]["numActions"] = 3 + extra_actions # TODO how many actions?
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
 
@@ -123,7 +123,7 @@ class Box2DInsertion(VecTask):
         self.axes_geom = gymutil.AxesGeometry(0.1)
 
         # Default IC stiffness and damping
-        # 2 prismatic joints + 1 revolute joint
+        # 3 prismatic joints + 1 revolute joint
         self.kp = torch.zeros((self.num_envs, 3, 6 if self.enable_orientations else 3), device=self.device)
         self.kp_pos_factor = 5. if self.control_vel else 50.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
@@ -139,7 +139,7 @@ class Box2DInsertion(VecTask):
         self.kv_orn_factor = 10. if self.control_vel and self.learn_orientations else 50.
 
         self.enable_sparse_reward = self.cfg["env"]["enableSparseReward"]
-        self.initial_position_bounds = self.cfg["env"].get("initialPositionBounds", [[-1, -1], [1, 1]]) #TODO make 3d
+        self.initial_position_bounds = self.cfg["env"].get("initialPositionBounds", [[-1, -1, -1], [1, 1, 1]]) #TODO make 3d
 
         self.use_init_states = self.cfg["env"].get('useInitStates', 'False')
         if self.use_init_states:
@@ -176,7 +176,7 @@ class Box2DInsertion(VecTask):
         plane_params = gymapi.PlaneParams()
         # set the normal force to be z dimension
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0) if self.up_axis == 'z' else gymapi.Vec3(0.0, 1.0, 0.0)
-        plane_params.distance = 0.01
+        plane_params.distance = 0.0
         plane_params.dynamic_friction = 0.
         plane_params.static_friction = 0.
         plane_params.restitution = 0.
@@ -197,8 +197,8 @@ class Box2DInsertion(VecTask):
         asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = True
         asset_options.armature = 0.01
-        box2d_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
-        self.num_dof = self.gym.get_asset_dof_count(box2d_asset)
+        box3d_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+        self.num_dof = self.gym.get_asset_dof_count(box3d_asset)
 
         # default pose
         box_size = 0.05
@@ -211,7 +211,7 @@ class Box2DInsertion(VecTask):
             pose.r = gymapi.Quat(0, 0.0, 0.0, 1)
 
         self.envs = []
-        self.box2d_handles = []
+        self.box3d_handles = []
         self.box_rb_idxs = []
         for i in range(self.num_envs):
             # create env instance
@@ -220,24 +220,25 @@ class Box2DInsertion(VecTask):
             )
             self.envs.append(env_ptr)
 
-            box2d_handle = self.gym.create_actor(env_ptr, box2d_asset, pose, "box2d", i, 0, 0)
+            box3d_handle = self.gym.create_actor(env_ptr, box3d_asset, pose, "box3d", i, 0, 0)
 
             # Set properties for the 2 prismatic and 1 revolute joint
-            dof_props = self.gym.get_actor_dof_properties(env_ptr, box2d_handle)
+            dof_props = self.gym.get_actor_dof_properties(env_ptr, box3d_handle)
             dof_props['driveMode'][0] = gymapi.DOF_MODE_EFFORT
             dof_props['driveMode'][1] = gymapi.DOF_MODE_EFFORT
             dof_props['driveMode'][2] = gymapi.DOF_MODE_EFFORT
+            #dof_props['driveMode'][3] = gymapi.DOF_MODE_EFFORT
             dof_props['stiffness'][:] = 0.0
             dof_props['damping'][:] = 0.0
-            if not self.enable_orientations:
-                dof_props['lower'][2] = 0.0
-                dof_props['upper'][2] = 0.0
-            self.gym.set_actor_dof_properties(env_ptr, box2d_handle, dof_props)
+           # if not self.enable_orientations:
+                #dof_props['lower'][3] = 0.0
+                #dof_props['upper'][3] = 0.0
+            self.gym.set_actor_dof_properties(env_ptr, box3d_handle, dof_props)
 
-            self.box2d_handles.append(box2d_handle)
+            self.box3d_handles.append(box3d_handle)
 
             # index of box rigid body
-            rb_idx = self.gym.find_actor_rigid_body_index(env_ptr, box2d_handle, 'box', gymapi.DOMAIN_SIM)
+            rb_idx = self.gym.find_actor_rigid_body_index(env_ptr, box3d_handle, 'box', gymapi.DOMAIN_SIM)
             self.box_rb_idxs.append(rb_idx)
 
     def compute_observations(self, env_ids=None):
@@ -261,7 +262,7 @@ class Box2DInsertion(VecTask):
         return self.obs_buf
 
     def compute_reward(self):
-        self.rew_buf[:], self.reset_buf[:] = compute_box2d_insertion_reward(
+        self.rew_buf[:], self.reset_buf[:] = compute_box3d_insertion_reward(
             self.obs_buf,
             self.reset_buf, self.progress_buf, self.max_episode_length,
             enable_velocities_states=self.enable_velocities_states,
@@ -278,7 +279,11 @@ class Box2DInsertion(VecTask):
 
             positions[:, 0] = (min_initial_position[0] - max_initial_position[0]) * torch.rand(len(env_ids), device=self.device) + max_initial_position[0]
             positions[:, 1] = (min_initial_position[1] - max_initial_position[1]) * torch.rand(len(env_ids), device=self.device) + max_initial_position[1]
+            positions[:, 2] = (min_initial_position[2] - max_initial_position[2]) * torch.rand(len(env_ids), device=self.device) + max_initial_position[2]
 
+            """
+            NOT NEEDED IN 3D?
+            
             #TODO make this rejection better? used to not sample inside the robot
             #TODO still correct for Stick?
             bad_locations_x = torch.where(torch.less(torch.abs(positions[:, 0]), 0.16), True, False)
@@ -299,9 +304,9 @@ class Box2DInsertion(VecTask):
                     torch.logical_and(torch.greater(positions[:, 1], -0.11), torch.less(positions[:, 1], 0.06)), True,
                     False)
                 bad_locations = torch.where(torch.logical_and(bad_locations_x, bad_locations_y), True, False)
-
+        """
         if self.enable_orientations:
-            positions[:, 2] = (-np.pi/2 - np.pi/2) * torch.rand(len(env_ids), device=self.device) + np.pi/2
+            positions[:, 3] = (-np.pi/2 - np.pi/2) * torch.rand(len(env_ids), device=self.device) + np.pi/2
 
         velocities = torch.zeros((len(env_ids), self.num_dof), device=self.device)
 
@@ -316,13 +321,24 @@ class Box2DInsertion(VecTask):
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
+    def reset(self):
+        """
+        Overwrite since super class reset method does reset to (0,0) and this is called initally. We do not want to start in (0,0)
+        """
+        env_ids = torch.tensor(list(range(self.num_envs)), device=self.device)
+        self.reset_idx(env_ids)
+        self.post_physics_step()
+
+        return super().reset()
+
+
     def pre_physics_step(self, actions):
         actions_dof_tensor = torch.zeros((self.num_envs, self.num_dof), device=self.device, dtype=torch.float)
 
         if not self.enable_ic:
             # Direct control
             if not self.learn_orientations:
-                actions_dof_tensor[:, :2] = actions.to(self.device).squeeze()
+                actions_dof_tensor[:, :3] = actions.to(self.device).squeeze()
             else:
                 actions_dof_tensor = actions.to(self.device).squeeze()
         else:
@@ -334,7 +350,7 @@ class Box2DInsertion(VecTask):
             idx = 0
             if self.learn_stiffness:
                 # TODO: Make sure Kpos_orn is positive definite
-                idx = 2 if not self.learn_orientations else 3
+                idx = 3 if not self.learn_orientations else 4  # TODO should be 5 since rotate in 2 directions or even 6 for Roll pitch yaw
                 action_kp_pos = actions[:, idx:idx+4]
                 action_kp_pos_matrix = action_kp_pos.reshape(-1, 2, 2)
                 kp[:, :2, :2] = self.kp_pos_factor * torch.bmm(action_kp_pos_matrix, action_kp_pos_matrix.transpose(-2, -1))
@@ -367,12 +383,12 @@ class Box2DInsertion(VecTask):
             if not self.control_vel:
                 # control the position
                 box_pos_des = box_pos_cur.clone()
-                box_pos_des[:, :2] = actions[:, :2]  # Modify only the x-y positions
+                box_pos_des[:, :3] = actions[:, :3]  # Modify only the x-y-z positions
                 pos_err = box_pos_des * self.dt  # x_des - x = x + dx_des * dt - x = dx_des * dt
             else:
                 # control the velocity
                 box_lin_vel_des = box_lin_vel_cur.clone()
-                box_lin_vel_des[:, :2] = actions[:, :2] # Modify only the x-y positions
+                box_lin_vel_des[:, :3] = actions[:, :3] # Modify only the x-y-z positions
                 pos_err = box_lin_vel_des - box_lin_vel_cur
 
             # orientations / angular velocities
@@ -384,6 +400,7 @@ class Box2DInsertion(VecTask):
                     box_orn_des[..., 3] = 1.  # no rotation wrt the base
                     orn_err = orientation_error(box_orn_des, box_orn_cur)
                 else:
+                    # TODO what to control here
                     if not self.control_vel:
                         # control the angle
                         box_orn_aa_des = torch.zeros(box_orn_cur.shape[0], 3, device=self.device)
@@ -448,16 +465,19 @@ def distance_orientation(desired, current):
     return 1. - (desired*current).sum(-1)**2
 
 @torch.jit.script
-def compute_box2d_insertion_reward(
+def compute_box3d_insertion_reward(
         box_state_buf, reset_buf, progress_buf, max_episode_length,
         enable_velocities_states=False, enable_orientations=False, enable_sparse_reward=False
 ):
     # type: (torch.Tensor, torch.Tensor, torch.Tensor, int, bool, bool, bool) -> Tuple[torch.Tensor, torch.Tensor]
 
     box_positions = box_state_buf[..., 0:3]
+    box_positions[..., 2] -= 0.027  # TODO why need to do this? because z min is this since box cannot go below ground?
     box_pos_dist = torch.sqrt(
         box_positions[..., 0] * box_positions[..., 0] +
-        box_positions[..., 1] * box_positions[..., 1]
+        box_positions[..., 1] * box_positions[..., 1] +
+        box_positions[..., 2] * box_positions[..., 2]
+
     )
     reward = -box_pos_dist
 
@@ -470,6 +490,7 @@ def compute_box2d_insertion_reward(
         reward -= box_orn_dist
 
     condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.005)
+
     if enable_orientations:
         condition = torch.logical_and(condition, box_orn_dist < 0.1)
 

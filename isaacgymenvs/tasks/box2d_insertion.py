@@ -61,6 +61,10 @@ class Box2DInsertion(VecTask):
 
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
         self.max_push_effort = self.cfg["env"]["maxEffort"]
+        self.minimum_linear_velocity_norm = self.cfg["env"].get("minimum_linear_velocity_norm", 0.)
+        self.maximum_linear_velocity_norm = self.cfg["env"].get("maximum_linear_velocity_norm", 10.)
+        self.minimum_angular_velocity_norm = self.cfg["env"].get("minimum_angular_velocity_norm", 0.)
+        self.maximum_angular_velocity_norm = self.cfg["env"].get("maximum_angular_velocity_norm", 1.)
 
         self.enable_velocities_states = self.cfg['env']['enableVelocityState']
         self.enable_orientations = self.cfg["env"]["enableOrientations"]
@@ -130,7 +134,7 @@ class Box2DInsertion(VecTask):
         self.kp_pos_factor = 10. if self.control_vel else 50.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
-            self.kp_orn_factor = 10. if self.control_vel and self.learn_orientations else 50.
+            self.kp_orn_factor = 0.07 if self.control_vel and self.learn_orientations else 50.
             self.kp[:, :3, 3:6] = self.kp_orn_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         self.enable_damping_term = self.cfg["env"]["enableDampingTerm"]
         if self.enable_damping_term:
@@ -162,6 +166,7 @@ class Box2DInsertion(VecTask):
             bottom = torch.stack((bottom_x, bottom_y), dim=1)
 
             self.initial_states = torch.cat((top, middle_left, middle_right, bottom))
+
 
 
     def create_sim(self):
@@ -234,6 +239,7 @@ class Box2DInsertion(VecTask):
             if not self.enable_orientations:
                 dof_props['lower'][2] = 0.0
                 dof_props['upper'][2] = 0.0
+
             self.gym.set_actor_dof_properties(env_ptr, box2d_handle, dof_props)
 
             self.box2d_handles.append(box2d_handle)
@@ -332,6 +338,16 @@ class Box2DInsertion(VecTask):
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
+    def reset(self):
+        """
+        Overwrite since super class reset method does reset to (0,0) and this is called initally. We do not want to start in (0,0)
+        """
+        env_ids = torch.tensor(list(range(self.num_envs)), device=self.device)
+        self.reset_idx(env_ids)
+        self.post_physics_step()
+
+        return super().reset()
+
     def pre_physics_step(self, actions):
         actions_dof_tensor = torch.zeros((self.num_envs, self.num_dof), device=self.device, dtype=torch.float)
 
@@ -388,6 +404,12 @@ class Box2DInsertion(VecTask):
             else:
                 # control the velocity
                 box_lin_vel_des = box_lin_vel_cur.clone()
+
+                # clip linear velocity by norm
+                velocity_norm = torch.norm(actions[:, :2] + 1e-6, p=2, dim=1)
+                scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm, self.maximum_linear_velocity_norm) / velocity_norm
+                actions[:, :2] = scale_ratio.view(-1, 1) * actions[:, :2]
+
                 box_lin_vel_des[:, :2] = actions[:, :2] # Modify only the x-y positions
                 pos_err = box_lin_vel_des - box_lin_vel_cur
 
@@ -409,8 +431,21 @@ class Box2DInsertion(VecTask):
                     else:
                         # control the angular velocity
                         box_ang_vel_des = box_ang_vel_cur.clone()
+
+                        # clip angular velocity by norm
+                        raise NotImplementedError #TODO check if works
+                        velocity_norm = torch.norm(actions[:, 2] + 1e-6, p=2, dim=1)
+                        scale_ratio = torch.clip(velocity_norm, self.minimum_angular_velocity_norm,
+                                                 self.maximum_angular_velocity_norm) / velocity_norm
+                        actions[:, 2] = scale_ratio.view(-1, 1) * actions[:, 2]
+
                         box_ang_vel_des[..., 2] = actions[:, 2]  # angular velocity around z-axis
                         orn_err = box_ang_vel_des - box_ang_vel_cur
+                        print("action", actions)
+                        print("orn_err", orn_err)
+                        print("box_ang_vel_des", box_ang_vel_des)
+                        print("box_ang_vel_cur", box_ang_vel_cur)
+
                 dpose = torch.cat([pos_err, orn_err], -1)
             else:
                 dpose = pos_err
@@ -494,5 +529,9 @@ def compute_box2d_insertion_reward(
 
     if enable_sparse_reward:
         reward = reward * 0 - 1
+
+    #add_final_reward = torch.where(condition, torch.ones_like(reward)*10., torch.zeros_like(reward))
+    #reward = reward + add_final_reward
+
 
     return reward, reset
