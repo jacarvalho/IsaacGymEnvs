@@ -60,6 +60,10 @@ class Box3DInsertion(VecTask):
 
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
         self.max_push_effort = self.cfg["env"]["maxEffort"]
+        self.minimum_linear_velocity_norm = self.cfg["env"].get("minimum_linear_velocity_norm", 0.)
+        self.maximum_linear_velocity_norm = self.cfg["env"].get("maximum_linear_velocity_norm", 10.)
+        self.minimum_angular_velocity_norm = self.cfg["env"].get("minimum_angular_velocity_norm", 0.)
+        self.maximum_angular_velocity_norm = self.cfg["env"].get("maximum_angular_velocity_norm", 1.)
 
         self.enable_velocities_states = self.cfg['env']['enableVelocityState']
         self.enable_orientations = self.cfg["env"]["enableOrientations"]
@@ -388,6 +392,12 @@ class Box3DInsertion(VecTask):
             else:
                 # control the velocity
                 box_lin_vel_des = box_lin_vel_cur.clone()
+
+                # clip linear velocity by norm
+                velocity_norm = torch.norm(actions[:, :3] + 1e-6, p=2, dim=1)
+                scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm, self.maximum_linear_velocity_norm) / velocity_norm
+                actions[:, :3] = scale_ratio.view(-1, 1) * actions[:, :3]
+
                 box_lin_vel_des[:, :3] = actions[:, :3] # Modify only the x-y-z positions
                 pos_err = box_lin_vel_des - box_lin_vel_cur
 
@@ -410,6 +420,14 @@ class Box3DInsertion(VecTask):
                     else:
                         # control the angular velocity
                         box_ang_vel_des = box_ang_vel_cur.clone()
+
+                        # clip angular velocity by norm
+                        raise NotImplementedError  # TODO check if works
+                        velocity_norm = torch.norm(actions[:, 2] + 1e-6, p=2, dim=1)
+                        scale_ratio = torch.clip(velocity_norm, self.minimum_angular_velocity_norm,
+                                                 self.maximum_angular_velocity_norm) / velocity_norm
+                        actions[:, 2] = scale_ratio.view(-1, 1) * actions[:, 2]
+
                         box_ang_vel_des[..., 2] = actions[:, 2]  # angular velocity around z-axis
                         orn_err = box_ang_vel_des - box_ang_vel_cur
                 dpose = torch.cat([pos_err, orn_err], -1)
