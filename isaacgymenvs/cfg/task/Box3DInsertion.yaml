@@ -1,0 +1,71 @@
+# used to create the object
+name: Box3DInsertion
+
+physics_engine: ${..physics_engine}
+
+# if given, will override the device setting in gym. 
+env:
+  numEnvs: ${resolve_default:100,${...num_envs}}
+  envSpacing: 1.5
+
+  asset:
+    assetRoot: "/home/carvalho/Projects/LieFlowsRL/lieflows-rl/robots/insertion_task/assets"
+#    assetRoot: "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets"
+    #assetRoot: "/home/jascha/LieflowsRl/robots/insertion_task/assets"  # Path on Franklin
+    assetFileName: "urdf/box3d_insertion.urdf"
+
+  maxEpisodeLength: 500
+
+  initialPositionBounds: [[-0.7, -0.7, 0.1], [0.7, 0.7, 0.7]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
+  enableSparseReward: True  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
+  useInitStates: False  # If set, the initial states will be sampled from a given list
+
+  maxEffort: 100.0
+
+  minimum_linear_velocity_norm: 0.
+  maximum_linear_velocity_norm: 5.0
+  minimum_angular_velocity_norm: 0.
+  maximum_angular_velocity_norm: 1.0
+  clipObservations: 1.0
+#  clipActions: 10.0
+
+  enableVelocityState: False  # If true, uses lin and ang velocity in the state, along with the position
+  enableOrientations: False  # If true, includes the orientations as part of the state and controller
+
+  enableIC: True  # If false, actions are torques
+  controlVelocity: True  # If false, IC controls the position. If true, control directly the velocity u = K*(dx_des - dx) - D*dx_des
+  learnOrientations: False  # If false, the desired orientation is fixed. If true, is learned by the policy
+  enableDampingTerm: True  # If false, remove the damping term D of the controller (only makes sense with controlVelocity)
+  learnStiffness: False
+  learnDamping: False
+
+  enableDebugVis: True
+
+  enableCameraSensors: False  # set to True if you use camera sensors in the environment
+
+sim:
+  dt: 0.0166 # 1/60 s
+  #dt: 0.04 # 1/25 s
+#  dt: 0.1 # 1/10 s
+  substeps: 2
+  up_axis: "z"
+  use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+  gravity: [0.0, 0.0, -9.81]
+
+  physx:
+    num_threads: ${....num_threads}
+    solver_type: ${....solver_type}
+    use_gpu: ${contains:"cuda",${....sim_device}} # set to False to run on CPU
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.001
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 100.0
+    default_buffer_size_multiplier: 2.0
+    max_gpu_contact_pairs: 1048576 # 1024*1024
+    num_subscenes: ${....num_subscenes}
+    contact_collection: 0 # 0: CC_NEVER (don't collect contact info), 1: CC_LAST_SUBSTEP (collect only contacts on last substep), 2: CC_ALL_SUBSTEPS (default - all contacts)
+
+task:
+  randomize: False
