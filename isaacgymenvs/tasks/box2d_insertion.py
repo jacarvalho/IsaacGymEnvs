@@ -41,16 +41,6 @@ from isaacgym.torch_utils import *
 from tasks.base.vec_task import VecTask
 
 
-@torch.jit.script
-def orientation_error(desired, current):
-    """
-    https://studywolf.wordpress.com/2018/12/03/force-control-of-task-space-orientation/
-    """
-    cc = quat_conjugate(current)
-    q_r = quat_mul(desired, cc)
-    return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
-
-
 class Box2DInsertion(VecTask):
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
@@ -60,7 +50,6 @@ class Box2DInsertion(VecTask):
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
 
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
-        self.max_push_effort = self.cfg["env"]["maxEffort"]
         self.minimum_linear_velocity_norm = self.cfg["env"].get("minimum_linear_velocity_norm", 0.)
         self.maximum_linear_velocity_norm = self.cfg["env"].get("maximum_linear_velocity_norm", 10.)
         self.minimum_angular_velocity_norm = self.cfg["env"].get("minimum_angular_velocity_norm", 0.)
@@ -131,11 +120,12 @@ class Box2DInsertion(VecTask):
         # Default IC stiffness and damping
         # 2 prismatic joints + 1 revolute joint
         self.kp = torch.zeros((self.num_envs, 3, 6 if self.enable_orientations else 3), device=self.device)
-        self.kp_pos_factor = 10. if self.control_vel else 50.
+        self.kp_pos_factor = 20. if self.control_vel else 50.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
-            self.kp_orn_factor = 0.07 if self.control_vel and self.learn_orientations else 50.
+            self.kp_orn_factor = 1.0 if self.control_vel and self.learn_orientations else 50.
             self.kp[:, :3, 3:6] = self.kp_orn_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
+
         self.enable_damping_term = self.cfg["env"]["enableDampingTerm"]
         if self.enable_damping_term:
             self.kv = torch.zeros_like(self.kp)
@@ -491,10 +481,20 @@ class Box2DInsertion(VecTask):
 #####################################################################
 ###=========================jit functions=========================###
 #####################################################################
+@torch.jit.script
+def orientation_error(desired, current):
+    """
+    https://studywolf.wordpress.com/2018/12/03/force-control-of-task-space-orientation/
+    """
+    cc = quat_conjugate(current)
+    q_r = quat_mul(desired, cc)
+    return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
+
 
 @torch.jit.script
 def distance_orientation(desired, current):
     return 1. - (desired*current).sum(-1)**2
+
 
 @torch.jit.script
 def compute_box2d_insertion_reward(
@@ -504,10 +504,7 @@ def compute_box2d_insertion_reward(
     # type: (torch.Tensor, torch.Tensor, torch.Tensor, int, bool, bool, bool) -> Tuple[torch.Tensor, torch.Tensor]
 
     box_positions = box_state_buf[..., 0:3]
-    box_pos_dist = torch.sqrt(
-        box_positions[..., 0] * box_positions[..., 0] +
-        box_positions[..., 1] * box_positions[..., 1]
-    )
+    box_pos_dist = torch.sqrt(box_positions[..., 0] ** 2 + box_positions[..., 1] ** 2)
     reward = -box_pos_dist
 
     box_orn_dist = torch.zeros_like(box_pos_dist)
@@ -519,7 +516,7 @@ def compute_box2d_insertion_reward(
         box_orn_dist = torch.atan2(box_orientations[:, 1], box_orientations[:, 0])
         reward -= box_orientations.sum(-1)**2
 
-    condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.005)
+    condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.01)
     if enable_orientations:
         condition = torch.logical_and(condition, box_orn_dist < 0.1)
 
