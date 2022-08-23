@@ -17,11 +17,7 @@ env:
   maxEpisodeLength: 300
 
   initialPositionBounds: [[-0.7, 0.2], [0.7, 0.7]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
-<<<<<<< HEAD
   enableSparseReward: False  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
-=======
-  enableSparseReward: True  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
->>>>>>> 1f34be6bab0d11b8fc0b443ea986cba6f4284931
   useInitStates: False  # If set, the initial states will be sampled from a given list
 
   maxEffort: 100.0
