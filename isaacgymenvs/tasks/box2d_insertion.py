@@ -167,8 +167,6 @@ class Box2DInsertion(VecTask):
 
             self.initial_states = torch.cat((top, middle_left, middle_right, bottom))
 
-
-
     def create_sim(self):
         self.dt = self.sim_params.dt
 

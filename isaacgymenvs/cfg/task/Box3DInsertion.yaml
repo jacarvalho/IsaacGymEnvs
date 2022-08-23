@@ -17,7 +17,7 @@ env:
   maxEpisodeLength: 500
 
   initialPositionBounds: [[-0.7, -0.7, 0.1], [0.7, 0.7, 0.7]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
-  enableSparseReward: True  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
+  enableSparseReward: False  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
   useInitStates: False  # If set, the initial states will be sampled from a given list
 
   maxEffort: 100.0
@@ -50,7 +50,8 @@ sim:
   substeps: 2
   up_axis: "z"
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
-  gravity: [0.0, 0.0, -9.81]
+#  gravity: [0.0, 0.0, -9.81]
+  gravity: [0.0, 0.0, 0.0]
 
   physx:
     num_threads: ${....num_threads}
