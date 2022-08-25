@@ -14,20 +14,20 @@ env:
     #assetRoot: "/home/jascha/LieflowsRl/robots/insertion_task/assets"  # Path on Franklin
     assetFileName: "urdf/box2d_insertion.urdf"
 
-  maxEpisodeLength: 500
+  maxEpisodeLength: 150
 
-  initialPositionBounds: [[-0.4, 0.1], [0.4, 0.4]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
-  enableSparseReward: True  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
+  initialPositionBounds: [[-0.2, 0.1], [0.2, 0.2]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
+  enableSparseReward: False  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
   useInitStates: False  # If set, the initial states will be sampled from a given list
 
   minimum_linear_velocity_norm: 0.
-  maximum_linear_velocity_norm: 5.0
+  maximum_linear_velocity_norm: 10.0
   minimum_angular_velocity_norm: 0.
-  maximum_angular_velocity_norm: 1.0
-  clipObservations: 1.0
+  maximum_angular_velocity_norm: 10.0
+#  clipObservations: 1.0
 #  clipActions: 10.0
 
-  enableVelocityState: False  # If true, uses lin and ang velocity in the state, along with the position
+  enableVelocityState: False  # If true, uses linear and angular velocities in the state, along with the position
   enableOrientations: False  # If true, includes the orientations as part of the state and controller
 
   enableIC: True  # If false, actions are torques
@@ -42,21 +42,22 @@ env:
   enableCameraSensors: False  # set to True if you use camera sensors in the environment
 
 sim:
+#  dt: 0.01 # 1/100 s
   dt: 0.0166 # 1/60 s
-  #dt: 0.04 # 1/25 s
+#  dt: 0.04 # 1/25 s
 #  dt: 0.1 # 1/10 s
-  substeps: 2
+  substeps: 5
   up_axis: "z"
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
-  gravity: [0.0, 0.0, -9.81]
+  gravity: [0.0, 0.0, 0.0]
   physx:
     num_threads: ${....num_threads}
     solver_type: ${....solver_type}
     use_gpu: ${contains:"cuda",${....sim_device}} # set to False to run on CPU
-    num_position_iterations: 4
-    num_velocity_iterations: 0
-    contact_offset: 0.02
-    rest_offset: 0.001
+    num_position_iterations: 6
+    num_velocity_iterations: 1
+    contact_offset: 0.01
+    rest_offset: 0.0
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 100.0
     default_buffer_size_multiplier: 2.0
