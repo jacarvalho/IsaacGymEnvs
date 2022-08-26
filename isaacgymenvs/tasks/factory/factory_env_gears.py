@@ -65,12 +65,11 @@ class FactoryEnvGears(FactoryBase, FactoryABCEnv):
         cs = hydra.core.config_store.ConfigStore.instance()
         cs.store(name='factory_schema_config_env', node=FactorySchemaConfigEnv)
 
-        config_path = os.path.join('task', 'FactoryEnvGears.yaml')  # relative to Gym's Hydra search path (cfg dir)
+        config_path = 'task/FactoryEnvGears.yaml'  # relative to Gym's Hydra search path (cfg dir)
         self.cfg_env = hydra.compose(config_name=config_path)
         self.cfg_env = self.cfg_env['task']  # strip superfluous nesting
 
-        asset_info_path = os.path.join('..', '..', 'assets', 'factory', 'yaml',
-                                       'factory_asset_info_gears.yaml')  # relative to Hydra search path (cfg dir)
+        asset_info_path = '../../assets/factory/yaml/factory_asset_info_gears.yaml'  # relative to Hydra search path (cfg dir)
         self.asset_info_gears = hydra.compose(config_name=asset_info_path)
         self.asset_info_gears = self.asset_info_gears['']['']['']['']['']['']['assets']['factory']['yaml']  # strip superfluous nesting
 
@@ -82,6 +81,7 @@ class FactoryEnvGears(FactoryBase, FactoryABCEnv):
         upper = gymapi.Vec3(self.cfg_base.env.env_spacing, self.cfg_base.env.env_spacing, self.cfg_base.env.env_spacing)
         num_per_row = int(np.sqrt(self.num_envs))
 
+        self.print_sdf_warning()
         franka_asset, table_asset = self.import_franka_assets()
         gear_small_asset, gear_medium_asset, gear_large_asset, base_asset = self._import_env_assets()
         self._create_actors(lower, upper, num_per_row, franka_asset, gear_small_asset, gear_medium_asset,
