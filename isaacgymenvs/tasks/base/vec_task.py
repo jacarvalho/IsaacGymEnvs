@@ -326,14 +326,26 @@ class VecTask(Env):
             actions = self.dr_randomizations['actions']['noise_lambda'](actions)
 
         action_tensor = torch.clamp(actions, -self.clip_actions, self.clip_actions)
-        # apply actions
-        self.pre_physics_step(action_tensor)
-
         # step physics and render each frame
-        for i in range(self.control_freq_inv):
-            if self.force_render:
-                self.render()
-            self.gym.simulate(self.sim)
+
+        if self.controller_freq is not None:
+            steps = int(self.dt / self.controller_freq)
+            for i in range(steps):
+                if self.recompute_prephysics_step:
+                    self.pre_physics_step(action_tensor, step=i)
+                if self.force_render:
+                    self.render()
+                self.gym.simulate(self.sim)
+        else:
+            #self.pre_physics_step(action_tensor, step=0)
+            for i in range(self.control_freq_inv):
+                self.pre_physics_step(action_tensor, step=i)
+                if self.force_render:
+                    self.render()
+                self.gym.simulate(self.sim)
+
+
+
 
         # to fix!
         if self.device == 'cpu':
