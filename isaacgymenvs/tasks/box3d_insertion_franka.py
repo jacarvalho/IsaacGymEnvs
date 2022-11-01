@@ -62,7 +62,7 @@ def axisangle2quat(vec, eps=1e-6):
     quat = torch.zeros(torch.prod(torch.tensor(input_shape)), 4, device=vec.device)
     quat[:, 3] = 1.0
 
-    # Grab indexes where angle is not zero an convert the input to its quaternion form
+    # Grab indexes where angle is not zero and convert the input to its quaternion form
     idx = angle.reshape(-1) > eps
     quat[idx, :] = torch.cat([
         vec[idx, :] * torch.sin(angle[idx, :] / 2.0) / angle[idx, :],
@@ -261,7 +261,6 @@ class FrankaBox3DInsertion(VecTask):
         table_stand_start_pose.p = gymapi.Vec3(*table_stand_pos)
         table_stand_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
-
         # compute aggregate size
         num_franka_bodies = self.gym.get_asset_rigid_body_count(franka_asset)
         num_franka_shapes = self.gym.get_asset_rigid_shape_count(franka_asset)
@@ -292,6 +291,7 @@ class FrankaBox3DInsertion(VecTask):
                 rand_rot[:, -1] = self.franka_rotation_noise * (-1. + np.random.rand() * 2.0)
                 new_quat = axisangle2quat(rand_rot).squeeze().numpy().tolist()
                 franka_start_pose.r = gymapi.Quat(*new_quat)
+
             franka_actor = self.gym.create_actor(env_ptr, franka_asset, franka_start_pose, "franka", i, 0, 0)
             self.gym.set_actor_dof_properties(env_ptr, franka_actor, franka_dof_props)
 
@@ -459,7 +459,8 @@ class FrankaBox3DInsertion(VecTask):
         self.reset_buf[env_ids] = 0
 
     def _compute_osc_torques(self, dpose, enable_nullspace=True):
-        # Solve for Operational Space Control # Paper: khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf
+        # Solve for Operational Space Control
+        # Paper: khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf
         # Helpful resource: studywolf.wordpress.com/2013/09/17/robot-control-4-operation-space-control/
         q, qd = self._q[:, :7], self._qd[:, :7]
         mm_inv = torch.inverse(self._mm)
