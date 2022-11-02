@@ -29,7 +29,7 @@
 import numpy as np
 import os
 import torch
-from pytorch3d.transforms import quaternion_to_matrix, quaternion_to_axis_angle
+#from pytorch3d.transforms import quaternion_to_matrix, quaternion_to_axis_angle
 
 from isaacgym import gymtorch
 from isaacgym import gymapi
@@ -37,6 +37,7 @@ from isaacgym.torch_utils import *
 
 from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
+import theseus as th
 
 
 @torch.jit.script
@@ -409,7 +410,8 @@ class FrankaBox3DInsertion(VecTask):
 
         if self.observation_type == "pos_and_rotMat":
             eef_quat_wxyz = quat_xyzw_to_wxyz(eef_quat)  # transform quaternion so that real part is first
-            eef_R = quaternion_to_matrix(eef_quat_wxyz)
+            eef_R = th.SO3(quaternion=eef_quat_wxyz).to_matrix()
+            #eef_R = quaternion_to_matrix(eef_quat_wxyz)
             self.obs_buf = torch.cat([eef_pos, eef_R.view(-1,9)], dim=-1)
         elif self.observation_type == "pos_and_quat":
             self.obs_buf = torch.cat([eef_pos, eef_quat], dim=-1)
@@ -524,7 +526,7 @@ class FrankaBox3DInsertion(VecTask):
         eef_orn_des[..., 3] = 1.  # no rotation wrt the base
         orn_err = orientation_error(eef_orn_des, eef_quat)
 
-        aa_orn_cur = quaternion_to_axis_angle(quat_xyzw_to_wxyz(eef_quat))
+        aa_orn_cur = th.SO3(quat_xyzw_to_wxyz(eef_quat)).log_map()
         aa_orn_des = torch.zeros_like(aa_orn_cur)
         aa_orn_des[..., 0] = -2.7431
         aa_orn_des[..., 1] = 1.8642
@@ -532,7 +534,7 @@ class FrankaBox3DInsertion(VecTask):
         aa_orn_err = aa_orn_des - aa_orn_cur
         orn_err = aa_orn_err
         print("cur orn quat", eef_quat[0])
-        print("cur orn AA", quaternion_to_axis_angle(quat_xyzw_to_wxyz(eef_quat[0])))
+        #print("cur orn AA", quaternion_to_axis_angle(quat_xyzw_to_wxyz(eef_quat[0])))
         print("orn err", orn_err[0])
 
         print("err orn", orn_err[0])

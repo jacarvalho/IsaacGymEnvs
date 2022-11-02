@@ -33,7 +33,7 @@ import torch
 import xml.etree.ElementTree as ET
 from typing import *
 
-from pytorch3d.transforms import quaternion_to_matrix
+#from pytorch3d.transforms import quaternion_to_matrix
 
 from isaacgym import gymutil, gymtorch, gymapi
 from isaacgym.torch_utils import *
