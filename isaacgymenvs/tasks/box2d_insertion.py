@@ -33,9 +33,6 @@ import torch
 import xml.etree.ElementTree as ET
 from typing import *
 
-#from pytorch3d.transforms import quaternion_multiply, axis_angle_to_quaternion
-#from pytorch3d.transforms import quaternion_to_matrix, matrix_to_euler_angles, euler_angles_to_matrix, matrix_to_quaternion
-
 from isaacgym import gymutil, gymtorch, gymapi
 from isaacgym.torch_utils import *
 from tasks.base.vec_task import VecTask

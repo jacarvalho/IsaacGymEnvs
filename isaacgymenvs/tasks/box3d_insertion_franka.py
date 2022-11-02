@@ -29,7 +29,6 @@
 import numpy as np
 import os
 import torch
-#from pytorch3d.transforms import quaternion_to_matrix, quaternion_to_axis_angle
 
 from isaacgym import gymtorch
 from isaacgym import gymapi
