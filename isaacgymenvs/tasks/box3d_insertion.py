@@ -41,7 +41,8 @@ from tasks.base.vec_task import VecTask
 
 import pytorch_kinematics as pk
 
-urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_LARGE_ROT_insertion.urdf"
+urdf_path = "../../../robots/insertion_task/assets/urdf/box3d_LARGE_ROT_insertion.urdf"
+# urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_LARGE_ROT_insertion.urdf"
 # urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_floating.urdf"
 ee_name = "box"
 batch = 100
