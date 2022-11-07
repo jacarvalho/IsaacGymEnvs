@@ -40,18 +40,7 @@ from isaacgym.torch_utils import *
 from tasks.base.vec_task import VecTask
 
 import pytorch_kinematics as pk
-
-urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_LARGE_ROT_insertion.urdf"
-# urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_floating.urdf"
-ee_name = "box"
-batch = 100
-d = "cuda" if torch.cuda.is_available() else "cpu"
-d = 'cuda'
-dtype = torch.float64
-
-# load robot description from URDF and specify end effector link
-robot = pk.build_serial_chain_from_urdf(open(urdf_path).read(), ee_name, root_link_name="base")
-robot.to(device=d)
+import theseus as th
 
 @torch.jit.script
 def orientation_error(desired, current):
@@ -301,24 +290,15 @@ class Box3DInsertion(VecTask):
             self.box_rb_idxs.append(rb_idx)
 
     def _create_robot_model(self):
-        # Platform asset
         if "asset" in self.cfg["env"]:
             asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.cfg["env"]["asset"]["assetRoot"])
             asset_file = self.cfg["env"]["asset"]["assetFileName"]
         else:
             raise KeyError
 
-        urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_LARGE_ROT_insertion.urdf"
-        # urdf_path = "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets/urdf/box3d_floating.urdf"
-        ee_name = "box"
-        batch = 100
-        d = "cuda" if torch.cuda.is_available() else "cpu"
-        d = 'cuda'
-        dtype = torch.float64
-
         # load robot description from URDF and specify end effector link
-        robot = pk.build_serial_chain_from_urdf(open(urdf_path).read(), ee_name, root_link_name="base")
-        robot.to(device=d)
+        self.robot = pk.build_serial_chain_from_urdf(open(asset_root+"/"+asset_file).read(), ee_name, root_link_name="base")
+        self.robot.to(device=self.device)
 
     def compute_observations(self, env_ids=None):
         if env_ids is None:
@@ -344,7 +324,7 @@ class Box3DInsertion(VecTask):
                 self.obs_buf[env_ids, 3:6] = self.dof_pos[env_ids, 3:6]
             if self.observe_rotation_matrix:
                 box_orientation_wxyz = quat_xyzw_to_wxyz(box_orientation)
-                rot_mat = quaternion_to_matrix(box_orientation_wxyz)
+                rot_mat = th.SO3(quaternion=box_orientation_wxyz).to_matrix()
                 self.obs_buf[env_ids, 3:12] = rot_mat[env_ids, :].view(-1,9)
             if self.observe_quaternion:
                 self.obs_buf[env_ids, 3:7] = box_orientation
@@ -495,7 +475,7 @@ class Box3DInsertion(VecTask):
                 box_vel_cur = box_lin_vel_cur
 
             # apply jacobian to map back to joint space error
-            J = robot.jacobian(self.dof_pos)
+            J = self.robot.jacobian(self.dof_pos)
             J_pinv = torch.linalg.pinv(J)
             dpose = J_pinv @ error.unsqueeze(dim=-1)
             dpose = dpose.squeeze()
