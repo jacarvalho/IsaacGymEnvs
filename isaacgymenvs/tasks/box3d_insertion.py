@@ -293,6 +293,7 @@ class Box3DInsertion(VecTask):
             asset_file = self.cfg["env"]["asset"]["assetFileName"]
         else:
             raise KeyError
+        ee_name = "box"
 
         # load robot description from URDF and specify end effector link
         self.robot = pk.build_serial_chain_from_urdf(open(asset_root+"/"+asset_file).read(), ee_name, root_link_name="base")
@@ -325,7 +326,8 @@ class Box3DInsertion(VecTask):
                 rot_mat = th.SO3(quaternion=box_orientation_wxyz).to_matrix()
                 self.obs_buf[env_ids, 3:12] = rot_mat[env_ids, :].view(-1,9)
             if self.observe_quaternion:
-                self.obs_buf[env_ids, 3:7] = box_orientation
+                box_orientation_wxyz = quat_xyzw_to_wxyz(box_orientation)
+                self.obs_buf[env_ids, 3:7] = box_orientation_wxyz
             if self.observe_velocities:
                 self.obs_buf[env_ids, 12:15] = box_linear_velocity[:, 0:3]  # box linear velocity
                 self.obs_buf[env_ids, 15:18] = box_angluar_velocity[:, 0:3]  # box angular velocity
@@ -552,7 +554,7 @@ def compute_box3d_insertion_reward(
             orn_error[..., 2] * orn_error[..., 2]
         )
     if reward_orientations:
-        reward -= box_orn_dist
+        reward -= box_orn_dist / np.pi
 
     condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.05)
     if enable_orientations:

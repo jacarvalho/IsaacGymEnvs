@@ -700,7 +700,7 @@ def compute_insertion_reward(
         pos_error[..., 1] * pos_error[..., 1] +
         pos_error[..., 2] * pos_error[..., 2]
     )
-    reward = -ee_pos_dist
+    reward = -ee_pos_dist * 3 # scale error according to scaling in observations
 
     orn_error = orientation_error(eef_quat_des, eef_quat)
     ee_orn_dist = torch.sqrt(
@@ -709,7 +709,7 @@ def compute_insertion_reward(
         orn_error[..., 2] * orn_error[..., 2]
     )
     if reward_orientations:
-        reward -= ee_orn_dist
+        reward -= ee_orn_dist / np.pi  # scale the error to be in 0 to 1
 
     max_pos_dist = 0.01
     max_orn_dist = 3.14159 / 180. * 5. # equals 5 degrees
