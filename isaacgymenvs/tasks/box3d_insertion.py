@@ -99,7 +99,7 @@ class Box3DInsertion(VecTask):
 
         self.control_vel = self.cfg["env"]["controlVelocity"]
         self.learn_stiffness = self.cfg["env"]["learnStiffness"]
-        self.learn_damping = self.cfg["env"]["learnDamping"]
+        self.learn_damping = self.cfg["env"].get("learnDamping", False)
         if self.learn_damping:
             assert self.learn_stiffness
 
@@ -160,20 +160,20 @@ class Box3DInsertion(VecTask):
         # Default IC stiffness and damping
         # 3 prismatic joints + 1 revolute joint
         self.kp = torch.zeros((self.num_envs, 6 if self.enable_orientations else 3, 6 if self.enable_orientations else 3), device=self.device)
-        self.kp_pos_factor = 1. if self.control_vel else 10.
+        self.kp_pos_factor = 100.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
-            self.kp_orn_factor = 1 if self.control_vel and self.observe_orientations else 20.
+            self.kp_orn_factor = 20.
             self.kp[:, 3:6, 3:6] = self.kp_orn_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
 
         self.enable_damping_term = self.cfg["env"]["enableDampingTerm"]
         if self.enable_damping_term:
             #standard_kv = 2 * torch.sqrt(self.kp)
             self.kv = torch.zeros((self.num_envs, 6 if self.enable_orientations else 3, 6 if self.enable_orientations else 3), device=self.device)
-            self.kv_pos_factor = 1. if self.control_vel else 0.5
+            self.kv_pos_factor = 2 * np.sqrt(self.kp_pos_factor)
             self.kv[:, :3, :3] = self.kv_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
             if self.enable_orientations:
-                self.kv_orn_factor = 1 if self.control_vel and self.observe_orientations else 1.
+                self.kv_orn_factor = 2 * np.sqrt(self.kp_orn_factor * 0.01)
                 self.kv[:, 3:6, 3:6] = self.kv_orn_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         else:
             self.kv = torch.zeros_like(self.kp)
@@ -482,7 +482,7 @@ class Box3DInsertion(VecTask):
 
             # torques
             #TODO box_Vel cur should be in joints! not box velocity, mul jacobbian also with this
-            actions_dof_tensor = kp @ dpose[..., None, ...] - kv @ box_vel_cur[..., None, ...]
+            actions_dof_tensor = kp @ dpose[..., None, ...] - kv @ box_vel_cur[..., None, ...] #TODO clean make box_vel_cur -> joint_vels!
             self.gym.refresh_dof_state_tensor(self.sim)
 
         forces = gymtorch.unwrap_tensor(actions_dof_tensor.squeeze())

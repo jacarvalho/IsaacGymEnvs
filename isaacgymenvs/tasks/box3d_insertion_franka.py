@@ -218,7 +218,7 @@ class FrankaBox3DInsertion(VecTask):
         franka_dof_damping = to_torch([0, 0, 0, 0, 0, 0, 0, 1.0e2, 1.0e2], dtype=torch.float, device=self.device)
 
         # Create table asset
-        insertion_object_height = 0.05
+        insertion_object_height = 0.15
         table_thickness = 0.05
         table_pos = [0.0, 0.0, -table_thickness/2-insertion_object_height/2]  # make so that center of insertion object can be in (0,0,0)
         table_opts = gymapi.AssetOptions()

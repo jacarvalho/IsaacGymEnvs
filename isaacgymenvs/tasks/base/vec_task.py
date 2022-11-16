@@ -338,8 +338,8 @@ class VecTask(Env):
                 self.gym.simulate(self.sim)
         else:
             #self.pre_physics_step(action_tensor, step=0)
+            self.pre_physics_step(action_tensor, step=0)
             for i in range(self.control_freq_inv):
-                self.pre_physics_step(action_tensor, step=i)
                 if self.force_render:
                     self.render()
                 self.gym.simulate(self.sim)

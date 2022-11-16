@@ -38,6 +38,7 @@ from isaacgym.torch_utils import *
 from tasks.base.vec_task import VecTask
 from gym import spaces
 import pytorch_kinematics as pk
+import theseus as th
 
 @torch.jit.script
 def orientation_error(desired, current):
@@ -48,18 +49,30 @@ def orientation_error(desired, current):
     q_r = quat_mul(desired, cc)
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
+@torch.jit.script
+def quat_wxyz_to_xyzw(quat_wxyz):
+    quat_xyzw = torch.zeros_like(quat_wxyz)
+    quat_xyzw[..., 3] = quat_wxyz[..., 0].clone()
+    quat_xyzw[..., 0:3] = quat_wxyz[..., 1:4].clone()
+    return quat_xyzw
 
+@torch.jit.script
+def quat_xyzw_to_wxyz(quat_xyzw):
+    quat_wxyz = torch.zeros_like(quat_xyzw)
+    quat_wxyz[..., 0] = quat_xyzw[..., 3].clone()
+    quat_wxyz[..., 1:4] = quat_xyzw[..., 0:3].clone()
+    return quat_wxyz
 
 class Box2DInsertion(VecTask):
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
-        self.use_osc = False
+        self.debug_dict = {}
+        self.debug_dict["velocities"] = []
         self.cfg = cfg
 
-        self.enable_PD_to_goal = self.cfg["env"].get("enable_PD_to_goal", False)
-        self.observe_force = self.cfg["env"].get("observeForce", False)
-
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
+        self.randomize = self.cfg["task"]["randomize"]
+        self.randomization_params = self.cfg["task"]["randomization_params"]
 
         self.controller_freq = self.cfg["env"].get("controller_freq", None)
         self.recompute_prephysics_step = self.cfg["env"].get("recomputePrePhysicsStep", False)
@@ -112,8 +125,6 @@ class Box2DInsertion(VecTask):
                 self.cfg["env"]["numObservations"] = 2 + 2
             else:
                 self.cfg["env"]["numObservations"] = 2 + 2 + 2 + 2
-        if self.observe_force:
-            self.cfg["env"]["numObservations"] += 3
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
@@ -137,21 +148,16 @@ class Box2DInsertion(VecTask):
         rb_state_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim)
         self.rb_state = gymtorch.wrap_tensor(rb_state_tensor)
 
-        if self.observe_force:
-            sensor_tensor = self.gym.acquire_force_sensor_tensor(self.sim)
-            sensors_per_env = 1
-            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
-
         # vis
         self.axes_geom = gymutil.AxesGeometry(0.3)
 
         # Default IC stiffness and damping
         # 2 prismatic joints + 1 revolute joint
         self.kp = torch.zeros((self.num_envs, 3, 3), device=self.device)
-        self.kp_pos_factor = 50.
+        self.kp_pos_factor = 10. if self.control_vel else 10.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
-            self.kp_orn_factor = 25.
+            self.kp_orn_factor = 20 if self.control_vel and self.observe_orientations else 20.
             self.kp[:, 2, 2] = self.kp_orn_factor
         else:
             # if no orientation, 0 gain for revolute joint
@@ -160,10 +166,10 @@ class Box2DInsertion(VecTask):
         self.enable_damping_term = self.cfg["env"]["enableDampingTerm"]
         if self.enable_damping_term:
             self.kv = torch.zeros((self.num_envs, 3, 3), device=self.device)
-            self.kv_pos_factor = 2 * np.sqrt(self.kp_pos_factor)
+            self.kv_pos_factor = 1. if self.control_vel else 0.5
             self.kv[:, :3, :3] = self.kv_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
             if self.enable_orientations:
-                self.kv_orn_factor = 2 * np.sqrt(self.kp_orn_factor*0.01)
+                self.kv_orn_factor = 1 if self.control_vel and self.observe_orientations else 0.5
                 self.kv[:, 2, 2] = self.kv_orn_factor
             else:
                 # if no orientation, 0 gain for revolute joint
@@ -195,6 +201,10 @@ class Box2DInsertion(VecTask):
 
             self.initial_states = torch.cat((top, middle_left, middle_right, bottom))
 
+        _massmatrix = self.gym.acquire_mass_matrix_tensor(self.sim, "box")
+        mm = gymtorch.wrap_tensor(_massmatrix)
+        self._mm = mm[:, :3, :3]
+
 
     def create_sim(self):
         self.dt = self.sim_params.dt
@@ -207,9 +217,9 @@ class Box2DInsertion(VecTask):
         self._create_envs(self.num_envs, self.cfg["env"]['envSpacing'], int(np.sqrt(self.num_envs)))
         self._create_robot_model()
 
-        _massmatrix = self.gym.acquire_mass_matrix_tensor(self.sim, "box")
-        mm = gymtorch.wrap_tensor(_massmatrix)
-        self._mm = mm[:, :3, :3]
+        # If randomizing, apply once immediately on startup before the fist sim step
+        if self.randomize:
+            self.apply_randomizations(self.randomization_params)
 
     def _create_ground_plane(self):
         plane_params = gymapi.PlaneParams()
@@ -235,7 +245,9 @@ class Box2DInsertion(VecTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = True
-        asset_options.armature = 0.01
+        #asset_options.armature = 0.01
+        #asset_options.density = 1000
+        #asset_options.override_inertia = True
         box2d_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(box2d_asset)
 
@@ -248,12 +260,6 @@ class Box2DInsertion(VecTask):
         else:
             pose.p = gymapi.Vec3(0., box_size / 2, 0.)
             pose.r = gymapi.Quat(0, 0.0, 0.0, 1)
-
-        if self.observe_force:
-            # create force sensors attached to the EEF
-            eef_index = self.gym.find_asset_rigid_body_index(box2d_asset, "box")
-            sensor_pose = gymapi.Transform()
-            self.gym.create_asset_force_sensor(box2d_asset, eef_index, sensor_pose)
 
         self.envs = []
         self.box2d_handles = []
@@ -274,17 +280,10 @@ class Box2DInsertion(VecTask):
             dof_props['driveMode'][2] = gymapi.DOF_MODE_EFFORT
             dof_props['stiffness'][:] = 0.0
             dof_props['damping'][:] = 0.0
-            if not self.enable_orientations:
-                dof_props['lower'][2] = 0.0
-                dof_props['upper'][2] = 0.0
 
             self.gym.set_actor_dof_properties(env_ptr, box2d_handle, dof_props)
-            self.box2d_handles.append(box2d_handle)
 
-            props = self.gym.get_actor_rigid_shape_properties(env_ptr, box2d_handle)
-            for prop in props:
-                prop.friction = 0.4  # see https://www.researchgate.net/publication/330003074_Wear_and_coefficient_of_friction_of_PLA_-_Graphite_composite_in_3D_printing_technology
-            self.gym.set_actor_rigid_shape_properties(env_ptr, box2d_handle, props)#
+            self.box2d_handles.append(box2d_handle)
 
             # index of box rigid body
             rb_idx = self.gym.find_actor_rigid_body_index(env_ptr, box2d_handle, 'box', gymapi.DOMAIN_SIM)
@@ -322,13 +321,6 @@ class Box2DInsertion(VecTask):
                 self.obs_buf[env_ids, 4:6] = box_linear_velocity[:, 0:2] # box linear velocity
                 self.obs_buf[env_ids, 6:8] = box_angluar_velocity[:, 0:2]  # box angular velocity
 
-        if self.observe_force:
-            self.gym.refresh_force_sensor_tensor(self.sim)
-            vec_force = torch.zeros_like(self.obs_buf[..., -3:])
-            vec_force[..., 0:2] = self.vec_sensor_tensor[..., 0:2]
-            vec_force[..., 2] = self.vec_sensor_tensor[..., 5]
-            self.obs_buf[env_ids, -3:] = vec_force[env_ids]
-
         return self.obs_buf
 
     def compute_reward(self):
@@ -350,6 +342,8 @@ class Box2DInsertion(VecTask):
             positions[:, 0] = (min_initial_position[0] - max_initial_position[0]) * torch.rand(len(env_ids), device=self.device) + max_initial_position[0]
             positions[:, 1] = (min_initial_position[1] - max_initial_position[1]) * torch.rand(len(env_ids), device=self.device) + max_initial_position[1]
 
+            #TODO make this rejection better? used to not sample inside the robot
+            #TODO still correct for Stick?
             bad_locations_x = torch.where(torch.less(torch.abs(positions[:, 0]), 0.16), True, False)
             bad_locations_y = torch.where(torch.logical_and(torch.greater(positions[:, 1], -0.11), torch.less(positions[:, 1], 0.06)), True, False)
             bad_locations = torch.where(torch.logical_and(bad_locations_x, bad_locations_y), True, False)
@@ -370,8 +364,7 @@ class Box2DInsertion(VecTask):
                 bad_locations = torch.where(torch.logical_and(bad_locations_x, bad_locations_y), True, False)
 
         if self.enable_orientations:
-            rot_lim = np.pi/2
-            positions[:, 2] = (-rot_lim - rot_lim) * torch.rand(len(env_ids), device=self.device) + rot_lim
+            positions[:, 2] = (-np.pi - np.pi) * torch.rand(len(env_ids), device=self.device) + np.pi
 
         velocities = torch.zeros((len(env_ids), self.num_dof), device=self.device)
 
@@ -416,20 +409,14 @@ class Box2DInsertion(VecTask):
         K_pos_y = a_pos_scaled[..., 1]
         K_orn = a_orn_scaled
         kp = torch.eye(3, device=self.device).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
-        kp[..., 0, 0] = K_pos_x
-        kp[..., 1, 1] = K_pos_y
-        kp[..., 2, 2] = K_orn
+        kp[..., 0, 0] = K_pos_x *0
+        kp[..., 1, 1] = K_pos_y *0
+        kp[..., 2, 2] = K_orn *0
 
         kv = torch.eye(3, device=self.device).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
-        if self.use_osc:
-            kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x)
-            kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y)
-            kv[..., 2, 2] = 2 * torch.sqrt(K_orn)  # mass is canceled in osc
-        else:
-            # the factors come from the mass matrix and need to be applied to get a stable system
-            kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x * 1)
-            kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y * 1)
-            kv[..., 2, 2] = 2 * torch.sqrt(K_orn * 0.01)
+        kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x)
+        kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y)
+        kv[..., 2, 2] = 2 * torch.sqrt(K_orn)
 
         return kp, kv
 
@@ -446,140 +433,141 @@ class Box2DInsertion(VecTask):
         self.robot.to(device=self.device)
 
     def pre_physics_step(self, actions, step=0):
+
         actions_dof_tensor = torch.zeros((self.num_envs, self.num_dof), device=self.device, dtype=torch.float)
 
-        if not self.enable_ic:
-            # Direct control
-            if not self.observe_orientations:
-                actions_dof_tensor[:, :2] = actions.to(self.device).squeeze()
+        self.control_freq_inv = 1
+
+        # refresh stuff because isaac makes me sad
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_mass_matrix_tensors(self.sim)
+
+        # Get current box poses and velocities
+        box_pos_cur = self.rb_state[self.box_rb_idxs, :3]
+        box_orn_cur = self.rb_state[self.box_rb_idxs, 3:7]
+        box_lin_vel_cur = self.rb_state[self.box_rb_idxs, 7:10]
+        box_ang_vel_cur = self.rb_state[self.box_rb_idxs, 10:13]
+
+        delta_pos_x = 0.
+        delta_pos_y = 0.
+        delta_orn = 0.01
+        K_pos_x = 0.
+        K_pos_y = 0.
+        K_orn = 0.
+
+        control_orn = True
+        control_pos = True
+
+        set_goal_orn = False
+        set_goal_pos = True
+
+        standard_damping = True
+
+        use_osc = False
+
+        if control_orn:
+            if set_goal_orn:
+                goal_orn = np.pi / 2
+
+                log_orn_cur = th.SO3(quaternion=quat_xyzw_to_wxyz(box_orn_cur)).log_map()
+                z_orn_cur = log_orn_cur[..., 2]
+                delta_orn = goal_orn - z_orn_cur
             else:
-                actions_dof_tensor = actions.to(self.device).squeeze()
+                delta_orn = 2.
+            K_orn = 12 # good K_orn in [5,150]
+
+        if control_pos:
+            if set_goal_pos:
+                goal_pos_x = 0.6
+                goal_pos_y = 0.0
+
+                delta_pos_x = goal_pos_x - box_pos_cur[..., 0]
+                delta_pos_y = goal_pos_y - box_pos_cur[..., 1]
+            else:
+                delta_pos_x = 0.
+                delta_pos_y = 0.
+            K_pos_x = 1000.
+            K_pos_y = 1000.  # ok K_pos in [5,1000]
+
+        kp = torch.eye(3, device=self.device).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
+        kp[..., 0, 0] = K_pos_x
+        kp[..., 1, 1] = K_pos_y
+        kp[..., 2, 2] = K_orn
+
+        #TODO multiply rotation by 0.01 and make mass again 1 note that if we not do this system gets unstabel and write why! because we do not know the mass! then our K and D do not make sense
+        #TODO check some values for min max for learning K
+        #just do OSC for all ENVS!!!!
+        #if time check dif inv kinematics with 0.01
+        kv = torch.eye(3, device=self.device).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
+        if standard_damping:
+            kv[..., 0, 0] = 2 * torch.sqrt(torch.tensor(K_pos_x))
+            kv[..., 1, 1] = 2 * torch.sqrt(torch.tensor(K_pos_y))
+            kv[..., 2, 2] = 2 * torch.sqrt(torch.tensor(K_orn * 0.01))  # NOTE: multiplying 0.01 works since this is from mass matrix
         else:
-            # refresh tensors
-            self.gym.refresh_rigid_body_state_tensor(self.sim)
-            self.gym.refresh_dof_state_tensor(self.sim)
-            self.gym.refresh_mass_matrix_tensors(self.sim)
+            kv[..., 0, 0] = 0
+            kv[..., 1, 1] = 0
+            kv[..., 2, 2] = 0.5
 
-            # Set (possibly learned) stiffness and damping matrices
+        ###  position error ###
+        pos_err = torch.zeros_like(box_lin_vel_cur)
+        pos_err[..., 0] = delta_pos_x
+        pos_err[..., 1] = delta_pos_y
 
-            if self.learn_stiffness:
-                kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 3:6].clone())
-            else:
-                kp = self.kp
-                kv = self.kv
+        ### orientaton error ###
+        orn_err = torch.zeros_like(box_ang_vel_cur)
+        orn_err[..., 2] = delta_orn
 
-            # Get current box poses and velocities
-            box_pos_cur = self.rb_state[self.box_rb_idxs, :3]
-            box_orn_cur = self.rb_state[self.box_rb_idxs, 3:7]
-            box_lin_vel_cur = self.rb_state[self.box_rb_idxs, 7:10]
-            box_ang_vel_cur = self.rb_state[self.box_rb_idxs, 10:13]
+        ### concat error ###
+        error_taskspace = torch.cat([pos_err[:, :2], orn_err[:, -1].view(-1, 1)], dim=1)
 
-            # positions / linear velocities
-            if not self.control_vel:
-                raise NotImplementedError
-            else:
-                if self.enable_PD_to_goal:
-                    signal_to_goal_pos = -box_pos_cur[:, :2]
-                    #clip first the PD signal
-                    velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
-                    scale_ratio = torch.clip(velocity_norm, 0., 0.05) / velocity_norm
-                    # add PD to signal from policy
-                    pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
+        ### get current velocities ###
+        task_vel = torch.cat([box_lin_vel_cur[:, :2], box_ang_vel_cur[:, -1].view(-1, 1)], dim=1)
 
-                    # clip linear velocity by norm
-                    velocity_norm = torch.norm(pos_err[:, :2] + 1e-6, p=2, dim=1)
-                    scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm,
-                                             self.maximum_linear_velocity_norm) / velocity_norm
-                    pos_err[:, :2] = scale_ratio.view(-1, 1) * pos_err[:, :2]
-                else:
-                    # clip linear velocity by norm
-                    velocity_norm = torch.norm(actions[:, :2] + 1e-6, p=2, dim=1)
-                    scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm, self.maximum_linear_velocity_norm) / velocity_norm
-                    actions[:, :2] = scale_ratio.view(-1, 1) * actions[:, :2]
+        ### Jacobian ###
+        J_6dof = self.robot.jacobian(self.dof_pos)
+        # we only need 3x3 jacobian since we have just rotation around z (4th and 5th column are 0 anyways)
+        J = torch.zeros(size=(self.num_envs, 3, 3), device=self.device)
+        J[..., 0:2, 0:3] = J_6dof[..., 0:2, 0:3]
+        J[..., 2, 0:3] = J_6dof[..., -1, 0:3]
 
-                    pos_err = actions[:, :2]
+        print("\n### Pre Physics ###")
+        print("position error", pos_err[0])
+        print("orientation error", orn_err[0][2])
+        print("Jacobian", J[0])
 
-            # orientations / angular velocities
-            if not self.enable_orientations:
-                raise NotImplementedError
-            else:
-                if not self.observe_orientations:
-                    # Orientation is not part of the policy output. The desired orientation is set to the final one.
-                    # control the angle
-                    box_orn_des = torch.zeros_like(box_orn_cur)
-                    box_orn_des[..., 3] = 1.  # no rotation wrt the base
-                    orn_err = orientation_error(box_orn_des, box_orn_cur)
-                else:
-                    if not self.control_vel:
-                        raise NotImplementedError
-                    else:
-                        orn_err = torch.zeros_like(box_ang_vel_cur)
+        if not use_osc:
+            # Differentiable Inverse Kinematics
+            J_pinv = torch.linalg.pinv(J)
+            error_joints = J_pinv @ error_taskspace.unsqueeze(dim=-1)
+            error_joints = error_joints.squeeze()
 
-                        if self.enable_PD_to_goal:
-                            box_orn_des = torch.zeros_like(box_orn_cur)
-                            box_orn_des[..., 3] = 1.  # no rotation wrt the base
+            joint_vel = self.dof_vel
+            # PD controller at the joint level
+            actions_dof_tensor = kp @ error_joints[..., None, ...] - kv @ joint_vel[..., None, ...]
+            print("kp * dpose", (kp @ error_joints[..., None, ...])[0][2])
+            print("kv * vel", (kv @ task_vel[..., None, ...])[0][2])
+            print("kp*dpose - kv*vel", actions_dof_tensor[0][2])
+        else:
+            # OSC
+            mm_inv = torch.inverse(self._mm)
+            m_eef_inv = J @ mm_inv @ torch.transpose(J, 1, 2)
+            m_eef = torch.inverse(m_eef_inv)
 
-                            # clip signal from PD
-                            signal_to_goal_orn = orientation_error(box_orn_des, box_orn_cur)
-                            velocity_norm = torch.abs(signal_to_goal_orn[:, 2] + 1e-6)
-                            scale_ratio = torch.clip(velocity_norm, 0.,
-                                                     0.1) / velocity_norm
-                            orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
+            actions_dof_tensor = J.transpose(2,1) @ m_eef @ (kp @ error_taskspace[..., None, ...] - kv @ task_vel[..., None, ...])
+            print("vel orn", task_vel[0][2])
+            print("kp * dpose", (kp @ error_taskspace[..., None, ...])[0][2])
+            print("kv * vel", (kv @ task_vel[..., None, ...])[0][2])
+            print("kp*dpose - kv*vel", actions_dof_tensor[0][2])
 
-                            # clip angular velocity by norm
-                            velocity_norm = torch.abs(orn_err[:, 2] + 1e-6)
-                            scale_ratio = torch.clip(velocity_norm, self.minimum_angular_velocity_norm,
-                                                     self.maximum_angular_velocity_norm) / velocity_norm
-                            orn_err[:, 2] = scale_ratio * orn_err[:, 2]
-                        else:
-                            # clip angular velocity by norm
-                            velocity_norm = torch.abs(actions[:, 2] + 1e-6)
-                            scale_ratio = torch.clip(velocity_norm, self.minimum_angular_velocity_norm,
-                                                     self.maximum_angular_velocity_norm) / velocity_norm
-                            actions[:, 2] = scale_ratio * actions[:, 2]
-
-                            orn_err[..., 2] = actions[:, 2] # angular velocity around z-axis
-
-
-
-
-                #error_norm = torch.abs(orn_err[:, 2] + 1e-6)
-                #scale_ratio = torch.clip(error_norm, 0., 0.1) / error_norm
-                #orn_err[:, 2] = scale_ratio * orn_err[:, 2]
-
-            ### concat error ###
-            error_taskspace = torch.cat([pos_err[:, :2], orn_err[:, -1].view(-1, 1)], dim=1)
-
-            ### get current velocities ###
-            task_vel = torch.cat([box_lin_vel_cur[:, :2], box_ang_vel_cur[:, -1].view(-1, 1)], dim=1)
-
-            ### Jacobian ###
-            J_6dof = self.robot.jacobian(self.dof_pos)
-            # we only need 3x3 jacobian since we have just rotation around z (4th and 5th column are 0 anyways)
-            J = torch.zeros(size=(self.num_envs, 3, 3), device=self.device)
-            J[..., 0:2, 0:3] = J_6dof[..., 0:2, 0:3]
-            J[..., 2, 0:3] = J_6dof[..., -1, 0:3]
-
-            if not self.use_osc:
-                # Differentiable Inverse Kinematics
-                J_pinv = torch.linalg.pinv(J)
-                error_joints = J_pinv @ error_taskspace.unsqueeze(dim=-1)
-                error_joints = error_joints.squeeze()
-
-                joint_vel = self.dof_vel
-                # PD controller at the joint level
-                actions_dof_tensor = kp @ error_joints[..., None, ...] - kv @ joint_vel[..., None, ...]
-            else:
-                # OSC
-                mm_inv = torch.inverse(self._mm)
-                m_eef_inv = J @ mm_inv @ torch.transpose(J, 1, 2)
-                m_eef = torch.inverse(m_eef_inv)
-
-                actions_dof_tensor = J.transpose(2, 1) @ m_eef @ (
-                            kp @ error_taskspace[..., None, ...] - kv @ task_vel[..., None, ...])
+        self.debug_dict["velocities"].append(task_vel[0].tolist())
+        print(self.debug_dict["velocities"])
 
         forces = gymtorch.unwrap_tensor(actions_dof_tensor.squeeze())
         self.gym.set_dof_actuation_force_tensor(self.sim, forces)
+
+
+
 
     def post_physics_step(self):
         self.progress_buf += 1
