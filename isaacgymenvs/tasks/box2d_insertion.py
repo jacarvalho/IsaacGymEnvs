@@ -415,6 +415,9 @@ class Box2DInsertion(VecTask):
         K_pos_x = a_pos_scaled[..., 0]
         K_pos_y = a_pos_scaled[..., 1]
         K_orn = a_orn_scaled
+
+        print(K_pos_x[0], K_pos_y[0], K_orn[0])
+
         kp = torch.eye(3, device=self.device).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         kp[..., 0, 0] = K_pos_x
         kp[..., 1, 1] = K_pos_y
@@ -482,7 +485,7 @@ class Box2DInsertion(VecTask):
                     signal_to_goal_pos = -box_pos_cur[:, :2]
                     #clip first the PD signal
                     velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
-                    scale_ratio = torch.clip(velocity_norm, 0., 0.05) / velocity_norm
+                    scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
                     # add PD to signal from policy
                     pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
 
@@ -523,7 +526,7 @@ class Box2DInsertion(VecTask):
                             signal_to_goal_orn = orientation_error(box_orn_des, box_orn_cur)
                             velocity_norm = torch.abs(signal_to_goal_orn[:, 2] + 1e-6)
                             scale_ratio = torch.clip(velocity_norm, 0.,
-                                                     0.1) / velocity_norm
+                                                     10.) / velocity_norm
                             orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
 
                             # clip angular velocity by norm

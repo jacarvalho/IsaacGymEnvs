@@ -283,6 +283,11 @@ class Box3DInsertion(VecTask):
 
             self.box3d_handles.append(box3d_handle)
 
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, box3d_handle)
+            for prop in props:
+                prop.friction = 0.4  # see https://www.researchgate.net/publication/330003074_Wear_and_coefficient_of_friction_of_PLA_-_Graphite_composite_in_3D_printing_technology
+            self.gym.set_actor_rigid_shape_properties(env_ptr, box3d_handle, props)#
+
             # index of box rigid body
             rb_idx = self.gym.find_actor_rigid_body_index(env_ptr, box3d_handle, 'box', gymapi.DOMAIN_SIM)
             self.box_rb_idxs.append(rb_idx)

@@ -348,27 +348,54 @@ class FrankaBox3DInsertion(VecTask):
             franka_actor = self.gym.create_actor(env_ptr, franka_asset, franka_start_pose, "franka", i, 0, 0)
             self.gym.set_actor_dof_properties(env_ptr, franka_actor, franka_dof_props)
 
+            friction_coefficient = 0.4  # see https://www.researchgate.net/publication/330003074_Wear_and_coefficient_of_friction_of_PLA_-_Graphite_composite_in_3D_printing_technology
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, franka_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, franka_actor, props)
+
             if self.aggregate_mode == 2:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
 
             # Create table
             table_actor = self.gym.create_actor(env_ptr, table_asset, table_start_pose, "table", i, 1, 0)
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, table_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, table_actor, props)
+
             table_stand_actor = self.gym.create_actor(env_ptr, table_stand_asset, table_stand_start_pose, "table_stand",
                                                       i, 1, 0)
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, table_stand_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, table_stand_actor, props)
 
             # Create insertion box
             insertion_box_top_actor = self.gym.create_actor(env_ptr, insertion_box_asset_top,
                                                             insertion_box_top_start_pose, "insertion_box_top",
                                                             i, 1, 0)
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, insertion_box_top_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, insertion_box_top_actor, props)
+
             insertion_box_bottom_actor = self.gym.create_actor(env_ptr, insertion_box_asset_bottom,
                                                             insertion_box_bottom_start_pose, "insertion_box_bottom",
                                                             i, 1, 0)
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, insertion_box_bottom_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, insertion_box_bottom_actor, props)
+
             insertion_box_left_actor = self.gym.create_actor(env_ptr, insertion_box_asset_left,
                                                             insertion_box_left_start_pose, "insertion_box_left",
                                                             i, 1, 0)
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, insertion_box_left_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, insertion_box_left_actor, props)
+
             insertion_box_right_actor = self.gym.create_actor(env_ptr, insertion_box_asset_right,
                                                             insertion_box_right_start_pose, "insertion_box_right",
                                                             i, 1, 0)
+            props = self.gym.get_actor_rigid_shape_properties(env_ptr, insertion_box_right_actor)
+            props[-1].friction = friction_coefficient
+            self.gym.set_actor_rigid_shape_properties(env_ptr, insertion_box_right_actor, props)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
@@ -528,6 +555,15 @@ class FrankaBox3DInsertion(VecTask):
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
 
+    def reset(self):
+        """
+        Overwrite since super class reset method does reset to (0,0) and this is called initally. We do not want to start in (0,0)
+        """
+        env_ids = torch.tensor(list(range(self.num_envs)), device=self.device)
+        self.post_physics_step()
+
+        return super().reset()
+
     def _compute_osc_torques(self, dpose, enable_nullspace=True):
         # Solve for Operational Space Control
         # Paper: khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf
@@ -572,14 +608,14 @@ class FrankaBox3DInsertion(VecTask):
             delta_orn = orientation_error(self.eef_orn_des, self.states["eef_quat"])
 
         # clip delta_pos by norm if larger than max_delta_pos
-        #delta_pos_norm = torch.norm(delta_pos + 1e-6, p=2, dim=1)
-        #delta_pos_scale_ratio = torch.clip(delta_pos_norm, 0.0, self.max_delta_pos) / delta_pos_norm
-        #delta_pos = delta_pos_scale_ratio.view(-1, 1) * delta_pos
+        delta_pos_norm = torch.norm(delta_pos + 1e-6, p=2, dim=1)
+        delta_pos_scale_ratio = torch.clip(delta_pos_norm, 0.0, self.max_delta_pos) / delta_pos_norm
+        delta_pos = delta_pos_scale_ratio.view(-1, 1) * delta_pos
 
         # clip delta_orn by norm if larger than max_delta_orn
-        #delta_orn_norm = torch.norm(delta_orn + 1e-6, p=2, dim=1)
-        #delta_orn_scale_ratio = torch.clip(delta_orn_norm, 0.0, self.max_delta_orn) / delta_orn_norm
-        #delta_orn = delta_orn_scale_ratio.view(-1, 1) * delta_orn
+        delta_orn_norm = torch.norm(delta_orn + 1e-6, p=2, dim=1)
+        delta_orn_scale_ratio = torch.clip(delta_orn_norm, 0.0, self.max_delta_orn) / delta_orn_norm
+        delta_orn = delta_orn_scale_ratio.view(-1, 1) * delta_orn
 
         # concatenate deltas in position and orientation
         u_arm = torch.cat([delta_pos, delta_orn], dim=-1)
