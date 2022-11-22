@@ -200,8 +200,11 @@ class FrankaBox3DInsertion(VecTask):
         franka_asset_file = "urdf/franka_description/robots/franka_panda.urdf"
 
         if "asset" in self.cfg["env"]:
-            asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.cfg["env"]["asset"].get("assetRoot", asset_root))
-            franka_asset_file = self.cfg["env"]["asset"].get("assetFileNameFranka", franka_asset_file)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            asset_root = project_root + self.cfg["env"]["asset"]["assetRoot"]
+            franka_asset_file = self.cfg["env"]["asset"]["assetFileNameFranka"]
+        else:
+            raise KeyError
 
         # load franka asset
         asset_options = gymapi.AssetOptions()

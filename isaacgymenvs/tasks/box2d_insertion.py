@@ -228,7 +228,8 @@ class Box2DInsertion(VecTask):
 
         # Platform asset
         if "asset" in self.cfg["env"]:
-            asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.cfg["env"]["asset"]["assetRoot"])
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            asset_root = project_root + self.cfg["env"]["asset"]["assetRoot"]
             asset_file = self.cfg["env"]["asset"]["assetFileName"]
         else:
             raise KeyError
@@ -438,7 +439,8 @@ class Box2DInsertion(VecTask):
 
     def _create_robot_model(self):
         if "asset" in self.cfg["env"]:
-            asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.cfg["env"]["asset"]["assetRoot"])
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            asset_root = project_root + self.cfg["env"]["asset"]["assetRoot"]
             asset_file = self.cfg["env"]["asset"]["assetFileName"]
         else:
             raise KeyError
