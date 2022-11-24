@@ -160,8 +160,10 @@ class FrankaBox3DInsertion(VecTask):
 
         # Franka defaults
         self.franka_default_dof_pos = to_torch(
-            [0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854], device=self.device
+            #[0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854], device=self.device
+            [-0.1692,  0.4817,  0.1881, -1.8218, -0.1215,  2.3025,  0.8042], device=self.device
         )
+
 
         # Gains
         self.kp = to_torch([150.] * 6, device=self.device) if self.control_type == "osc" else to_torch([150.] * 7,
@@ -230,7 +232,7 @@ class FrankaBox3DInsertion(VecTask):
 
         # Create table stand asset
         table_stand_height = 0.1
-        table_stand_pos = [-0.5, 0.0,  -insertion_object_height/2 + table_stand_height / 2]
+        table_stand_pos = [-0.7, 0.0,  -insertion_object_height/2 + table_stand_height / 2]
         table_stand_opts = gymapi.AssetOptions()
         table_stand_opts.fix_base_link = True
         table_stand_asset = self.gym.create_box(self.sim, *[0.2, 0.2, table_stand_height], table_opts)
@@ -277,8 +279,9 @@ class FrankaBox3DInsertion(VecTask):
         self.franka_dof_speed_scales = torch.ones_like(self.franka_dof_lower_limits)
 
         # Define start pose for franka
+        franka_offset = -0.65
         franka_start_pose = gymapi.Transform()
-        franka_start_pose.p = gymapi.Vec3(-0.45, 0.0, -insertion_object_height/2 + table_stand_height)
+        franka_start_pose.p = gymapi.Vec3(franka_offset, 0.0, -insertion_object_height/2 + table_stand_height)
         franka_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         # Define start pose for table
@@ -340,7 +343,7 @@ class FrankaBox3DInsertion(VecTask):
             # Potentially randomize start pose
             if self.franka_position_noise > 0:
                 rand_xy = self.franka_position_noise * (-1. + np.random.rand(2) * 2.0)
-                franka_start_pose.p = gymapi.Vec3(-0.45 + rand_xy[0], 0.0 + rand_xy[1],
+                franka_start_pose.p = gymapi.Vec3(franka_offset + rand_xy[0], 0.0 + rand_xy[1],
                                                  1.0 + table_thickness / 2 + table_stand_height)
             if self.franka_rotation_noise > 0:
                 rand_rot = torch.zeros(1, 3)
