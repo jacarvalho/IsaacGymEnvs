@@ -87,6 +87,7 @@ class FrankaBox3DInsertion(VecTask):
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
         self.cfg = cfg
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
+        self.observe_force = self.cfg["env"].get("observeForce", False)
 
         self.goal_position = [0., 0., 0.]
         #self.goal_orientation = [0.7071068, 0.7071068, 0, 0] #xyzw
@@ -125,6 +126,8 @@ class FrankaBox3DInsertion(VecTask):
             self.cfg["env"]["numObservations"] = 3
             # Actions include: delta position -> 3
             self.cfg["env"]["numActions"] = 3
+        if self.observe_force:
+            self.cfg["env"]["numObservations"] += 6
 
         # Values to be filled in at runtime
         self.states = {}                        # will be dict filled with relevant states to use for reward calculation
@@ -164,6 +167,11 @@ class FrankaBox3DInsertion(VecTask):
             [-0.1692,  0.4817,  0.1881, -1.8218, -0.1215,  2.3025,  0.8042], device=self.device
         )
 
+        # create force sensor tensor
+        if self.observe_force:
+            sensor_tensor = self.gym.acquire_net_force_tensor(self.sim)
+            sensors_per_env = 1
+            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
         # Gains
         self.kp = to_torch([150.] * 6, device=self.device) if self.control_type == "osc" else to_torch([150.] * 7,
@@ -218,6 +226,12 @@ class FrankaBox3DInsertion(VecTask):
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_EFFORT
         asset_options.use_mesh_materials = True
         franka_asset = self.gym.load_asset(self.sim, asset_root, franka_asset_file, asset_options)
+
+        # create force sensors attached to the EEF
+        if self.observe_force:
+            eef_index = self.gym.find_asset_rigid_body_index(franka_asset, "insertion_object")
+            sensor_pose = gymapi.Transform()
+            self.gym.create_asset_force_sensor(franka_asset, eef_index, sensor_pose)
 
         franka_dof_stiffness = to_torch([0, 0, 0, 0, 0, 0, 0, 5000., 5000.], dtype=torch.float, device=self.device)
         franka_dof_damping = to_torch([0, 0, 0, 0, 0, 0, 0, 1.0e2, 1.0e2], dtype=torch.float, device=self.device)
@@ -518,6 +532,10 @@ class FrankaBox3DInsertion(VecTask):
                 self.obs_buf = torch.cat([eef_pos, eef_quat_wxyz], dim=-1)
             else:
                 raise NotImplementedError
+
+        if self.observe_force:
+            self.gym.refresh_force_sensor_tensor(self.sim)
+            self.obs_buf = torch.cat((self.obs_buf, self.vec_sensor_tensor), dim=1)
 
         return self.obs_buf
 

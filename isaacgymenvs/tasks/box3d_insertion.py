@@ -70,6 +70,8 @@ class Box3DInsertion(VecTask):
 
         self.cfg = cfg
 
+        self.observe_force = self.cfg["env"].get("observeForce", False)
+
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
 
         self.controller_freq = self.cfg["env"].get("controller_freq", None)
@@ -128,6 +130,8 @@ class Box3DInsertion(VecTask):
                     self.cfg["env"]["numObservations"] = 3 + 4
             else:
                 raise NotImplementedError
+        if self.observe_force:
+            self.cfg["env"]["numObservations"] += 6
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
@@ -153,6 +157,14 @@ class Box3DInsertion(VecTask):
 
         rb_state_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim)
         self.rb_state = gymtorch.wrap_tensor(rb_state_tensor)
+
+        if self.observe_force:
+            sensor_tensor = self.gym.acquire_force_sensor_tensor(self.sim)
+            sensors_per_env = 1
+            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
+
+            _net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
+            self.contact_forces = gymtorch.wrap_tensor(_net_cf)
 
         # vis
         self.axes_geom = gymutil.AxesGeometry(0.3)
@@ -253,6 +265,17 @@ class Box3DInsertion(VecTask):
             pose.p = gymapi.Vec3(0., box_size / 2, 0.)
             pose.r = gymapi.Quat(0, 0.0, 0.0, 1)
 
+        # create force sensors attached to the EEF
+        if self.observe_force:
+            eef_index = self.gym.find_asset_rigid_body_index(box3d_asset, "box")
+            sensor_pose = gymapi.Transform()
+
+            sensor_props = gymapi.ForceSensorProperties()
+            sensor_props.enable_forward_dynamics_forces = True
+            sensor_props.enable_constraint_solver_forces = True
+
+            self.gym.create_asset_force_sensor(box3d_asset, eef_index, sensor_pose, sensor_props)
+
         self.envs = []
         self.box3d_handles = []
         self.box_rb_idxs = []
@@ -338,6 +361,13 @@ class Box3DInsertion(VecTask):
             if self.observe_velocities:
                 self.obs_buf[env_ids, 12:15] = box_linear_velocity[:, 0:3]  # box linear velocity
                 self.obs_buf[env_ids, 15:18] = box_angluar_velocity[:, 0:3]  # box angular velocity
+
+        if self.observe_force:
+            self.gym.refresh_force_sensor_tensor(self.sim)
+            self.gym.refresh_net_contact_force_tensor(self.sim)
+            self.obs_buf[env_ids, -6:] = self.vec_sensor_tensor[env_ids]
+            #IMPORTANT alter config to collect collisison!
+            print("contact forces", self.contact_forces[self.box_rb_idxs][0])
 
         return self.obs_buf
 
