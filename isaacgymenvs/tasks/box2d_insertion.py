@@ -113,7 +113,7 @@ class Box2DInsertion(VecTask):
             else:
                 self.cfg["env"]["numObservations"] = 2 + 2 + 2 + 2
         if self.observe_force:
-            self.cfg["env"]["numObservations"] += 3
+            self.cfg["env"]["numObservations"] += 2
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
@@ -141,6 +141,10 @@ class Box2DInsertion(VecTask):
             sensor_tensor = self.gym.acquire_force_sensor_tensor(self.sim)
             sensors_per_env = 1
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
+
+            #dof_sensor_tensor = self.gym.acquire_dof_force_tensor(self.sim)
+            #self.dof_forces = gymtorch.wrap_tensor(dof_sensor_tensor).view(self.num_envs, 3)
+            #self.first = True
 
         # vis
         self.axes_geom = gymutil.AxesGeometry(0.3)
@@ -237,6 +241,7 @@ class Box2DInsertion(VecTask):
         asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = True
         asset_options.armature = 0.01
+        asset_options.disable_gravity = True
         box2d_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(box2d_asset)
 
@@ -267,6 +272,7 @@ class Box2DInsertion(VecTask):
             self.envs.append(env_ptr)
 
             box2d_handle = self.gym.create_actor(env_ptr, box2d_asset, pose, "box", i, 0, 0)
+            #self.gym.enable_actor_dof_force_sensors(env_ptr, box2d_handle)
 
             # Set properties for the 2 prismatic and 1 revolute joint
             dof_props = self.gym.get_actor_dof_properties(env_ptr, box2d_handle)
@@ -325,10 +331,10 @@ class Box2DInsertion(VecTask):
 
         if self.observe_force:
             self.gym.refresh_force_sensor_tensor(self.sim)
-            vec_force = torch.zeros_like(self.obs_buf[..., -3:])
+            vec_force = torch.zeros_like(self.obs_buf[..., -2:])
             vec_force[..., 0:2] = self.vec_sensor_tensor[..., 0:2]
-            vec_force[..., 2] = self.vec_sensor_tensor[..., 5]
-            self.obs_buf[env_ids, -3:] = vec_force[env_ids]
+            self.obs_buf[env_ids, -2:] = vec_force[env_ids]
+            #print(self.vec_sensor_tensor[0])
 
         return self.obs_buf
 
@@ -417,7 +423,7 @@ class Box2DInsertion(VecTask):
         K_pos_y = a_pos_scaled[..., 1]
         K_orn = a_orn_scaled
 
-        print(K_pos_x[0], K_pos_y[0], K_orn[0])
+        #print(K_pos_x[0], K_pos_y[0], K_orn[0])
 
         kp = torch.eye(3, device=self.device).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         kp[..., 0, 0] = K_pos_x
@@ -545,9 +551,6 @@ class Box2DInsertion(VecTask):
 
                             orn_err[..., 2] = actions[:, 2] # angular velocity around z-axis
 
-
-
-
                 #error_norm = torch.abs(orn_err[:, 2] + 1e-6)
                 #scale_ratio = torch.clip(error_norm, 0., 0.1) / error_norm
                 #orn_err[:, 2] = scale_ratio * orn_err[:, 2]
@@ -583,8 +586,27 @@ class Box2DInsertion(VecTask):
                 actions_dof_tensor = J.transpose(2, 1) @ m_eef @ (
                             kp @ error_taskspace[..., None, ...] - kv @ task_vel[..., None, ...])
 
+        #actions_dof_tensor *= 0
+        #if self.first:
+        #    actions_dof_tensor[..., 2,0] = -1.
+        #    self.first = False
+
         forces = gymtorch.unwrap_tensor(actions_dof_tensor.squeeze())
         self.gym.set_dof_actuation_force_tensor(self.sim, forces)
+
+        #self.gym.refresh_force_sensor_tensor(self.sim)
+        #forces = self.vec_sensor_tensor.clone()[0]
+        #forces[torch.logical_and(forces >= 0, forces <= 1e-6)] = 0.
+        #forces[torch.logical_and(forces < 0, forces >= -1e-6)] = 0.
+        #print("force", forces* 100)
+
+        #self.gym.refresh_dof_force_tensor(self.sim)
+        #dof_forces = self.vec_sensor_tensor.clone()[0]
+        #dof_forces[torch.logical_and(dof_forces >= 0, dof_forces <= 1e-6)] = 0.
+        #dof_forces[torch.logical_and(dof_forces < 0, dof_forces >= -1e-6)] = 0.
+        #print("dof_force", dof_forces * 100)
+
+        #print("----")
 
     def post_physics_step(self):
         self.progress_buf += 1

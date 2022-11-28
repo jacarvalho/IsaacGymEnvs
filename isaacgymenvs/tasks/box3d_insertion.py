@@ -131,7 +131,7 @@ class Box3DInsertion(VecTask):
             else:
                 raise NotImplementedError
         if self.observe_force:
-            self.cfg["env"]["numObservations"] += 6
+            self.cfg["env"]["numObservations"] += 3
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
@@ -163,8 +163,8 @@ class Box3DInsertion(VecTask):
             sensors_per_env = 1
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
-            _net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
-            self.contact_forces = gymtorch.wrap_tensor(_net_cf)
+            #dof_sensor_tensor = self.gym.acquire_dof_force_tensor(self.sim)
+            #self.dof_forces = gymtorch.wrap_tensor(dof_sensor_tensor).view(self.num_envs, 6)
 
         # vis
         self.axes_geom = gymutil.AxesGeometry(0.3)
@@ -251,7 +251,9 @@ class Box3DInsertion(VecTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = True
-        asset_options.armature = 0.01
+        #asset_options.armature = 0.01
+        asset_options.disable_gravity = True
+        asset_options.enable_gyroscopic_forces = False
         box3d_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(box3d_asset)
 
@@ -271,14 +273,16 @@ class Box3DInsertion(VecTask):
             sensor_pose = gymapi.Transform()
 
             sensor_props = gymapi.ForceSensorProperties()
-            sensor_props.enable_forward_dynamics_forces = True
-            sensor_props.enable_constraint_solver_forces = True
+            sensor_props.enable_forward_dynamics_forces = True # default True
+            sensor_props.enable_constraint_solver_forces = True # default True
 
             self.gym.create_asset_force_sensor(box3d_asset, eef_index, sensor_pose, sensor_props)
 
         self.envs = []
         self.box3d_handles = []
         self.box_rb_idxs = []
+
+        self.actor_handles = []
         for i in range(self.num_envs):
             # create env instance
             env_ptr = self.gym.create_env(
@@ -287,6 +291,8 @@ class Box3DInsertion(VecTask):
             self.envs.append(env_ptr)
 
             box3d_handle = self.gym.create_actor(env_ptr, box3d_asset, pose, "box3d", i, 0, 0)
+            self.actor_handles.append(box3d_handle)
+            #self.gym.enable_actor_dof_force_sensors(env_ptr, box3d_handle)
 
             # Set properties for the 2 prismatic and 1 revolute joint
             dof_props = self.gym.get_actor_dof_properties(env_ptr, box3d_handle)
@@ -364,10 +370,17 @@ class Box3DInsertion(VecTask):
 
         if self.observe_force:
             self.gym.refresh_force_sensor_tensor(self.sim)
-            self.gym.refresh_net_contact_force_tensor(self.sim)
-            self.obs_buf[env_ids, -6:] = self.vec_sensor_tensor[env_ids]
-            #IMPORTANT alter config to collect collisison!
-            print("contact forces", self.contact_forces[self.box_rb_idxs][0])
+            self.obs_buf[env_ids, -3:] = self.vec_sensor_tensor[env_ids, 0:3]
+
+           # test = torch.transpose(self.robot.jacobian(self.dof_pos), 1, 2) @ self.vec_sensor_tensor.view(-1, 6, 1)
+
+            #self.gym.refresh_dof_force_tensor(self.sim)
+
+            #print("alternative dof force", self.gym.get_actor_dof_forces(self.envs[0], self.actor_handles[0]))
+            #print("dof force", self.dof_forces[0])
+            #print("force", self.vec_sensor_tensor[0])
+            #print("test", test[0])
+            #print("----------------")
 
         return self.obs_buf
 
@@ -520,8 +533,11 @@ class Box3DInsertion(VecTask):
             # torques
             #TODO box_Vel cur should be in joints! not box velocity, mul jacobbian also with this
             actions_dof_tensor = kp @ dpose[..., None, ...] - kv @ box_vel_cur[..., None, ...] #TODO clean make box_vel_cur -> joint_vels!
+            actions_dof_tensor = torch.ones_like(actions_dof_tensor) * 0.2
+
             self.gym.refresh_dof_state_tensor(self.sim)
 
+        #print(actions_dof_tensor[0])
         forces = gymtorch.unwrap_tensor(actions_dof_tensor.squeeze())
         self.gym.set_dof_actuation_force_tensor(self.sim, forces)
 

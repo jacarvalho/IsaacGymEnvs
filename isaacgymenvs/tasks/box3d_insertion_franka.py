@@ -127,7 +127,7 @@ class FrankaBox3DInsertion(VecTask):
             # Actions include: delta position -> 3
             self.cfg["env"]["numActions"] = 3
         if self.observe_force:
-            self.cfg["env"]["numObservations"] += 6
+            self.cfg["env"]["numObservations"] += 3
 
         # Values to be filled in at runtime
         self.states = {}                        # will be dict filled with relevant states to use for reward calculation
@@ -169,9 +169,15 @@ class FrankaBox3DInsertion(VecTask):
 
         # create force sensor tensor
         if self.observe_force:
-            sensor_tensor = self.gym.acquire_net_force_tensor(self.sim)
+            sensor_tensor = self.gym.acquire_force_sensor_tensor(self.sim)
             sensors_per_env = 1
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
+
+            #_net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
+            #self.net_cf = gymtorch.wrap_tensor(_net_cf)
+
+            #dof_sensor_tensor = self.gym.acquire_dof_force_tensor(self.sim)
+            #self.dof_forces = gymtorch.wrap_tensor(dof_sensor_tensor).view(self.num_envs, 7)
 
         # Gains
         self.kp = to_torch([150.] * 6, device=self.device) if self.control_type == "osc" else to_torch([150.] * 7,
@@ -229,9 +235,16 @@ class FrankaBox3DInsertion(VecTask):
 
         # create force sensors attached to the EEF
         if self.observe_force:
-            eef_index = self.gym.find_asset_rigid_body_index(franka_asset, "insertion_object")
+            eef_index = self.gym.find_asset_rigid_body_index(franka_asset, "panda_grip_site")
             sensor_pose = gymapi.Transform()
-            self.gym.create_asset_force_sensor(franka_asset, eef_index, sensor_pose)
+            sensor_pose.p = gymapi.Vec3(0., 0., 0.)
+            sensor_pose.r = gymapi.Quat(0, 0, 0, 1)
+
+            sensor_props = gymapi.ForceSensorProperties()
+            sensor_props.enable_forward_dynamics_forces = False # default True
+            sensor_props.enable_constraint_solver_forces = True # default True
+
+            self.gym.create_asset_force_sensor(franka_asset, eef_index, sensor_pose, sensor_props)
 
         franka_dof_stiffness = to_torch([0, 0, 0, 0, 0, 0, 0, 5000., 5000.], dtype=torch.float, device=self.device)
         franka_dof_damping = to_torch([0, 0, 0, 0, 0, 0, 0, 1.0e2, 1.0e2], dtype=torch.float, device=self.device)
@@ -368,6 +381,10 @@ class FrankaBox3DInsertion(VecTask):
             franka_actor = self.gym.create_actor(env_ptr, franka_asset, franka_start_pose, "franka", i, 0, 0)
             self.gym.set_actor_dof_properties(env_ptr, franka_actor, franka_dof_props)
 
+            #self.gym.enable_actor_dof_force_sensors(env_ptr, franka_actor)
+
+
+
             friction_coefficient = 0.4  # see https://www.researchgate.net/publication/330003074_Wear_and_coefficient_of_friction_of_PLA_-_Graphite_composite_in_3D_printing_technology
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, franka_actor)
             props[-1].friction = friction_coefficient
@@ -440,7 +457,7 @@ class FrankaBox3DInsertion(VecTask):
             "leftfinger_tip": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_leftfinger_tip"),
             "rightfinger_tip": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_rightfinger_tip"),
             "grip_site": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_grip_site"),
-            #"grip_site": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "insertion_object"),
+            "insertion_obj": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "insertion_object"),
 
         }
 
@@ -535,8 +552,19 @@ class FrankaBox3DInsertion(VecTask):
 
         if self.observe_force:
             self.gym.refresh_force_sensor_tensor(self.sim)
-            self.obs_buf = torch.cat((self.obs_buf, self.vec_sensor_tensor), dim=1)
+            self.obs_buf = torch.cat((self.obs_buf, self.vec_sensor_tensor[..., 0:3]), dim=1)
+            #print(self.vec_sensor_tensor[..., 0:3][0])
 
+            #test = torch.transpose(self._j_eef, 1, 2) @ self.vec_sensor_tensor.view(-1, 6, 1)
+            #print("obs", test[0])
+            #self.gym.refresh_net_contact_force_tensor(self.sim)
+
+            #self.gym.refresh_dof_force_tensor(self.sim)
+            #print("dof force", self.dof_forces[0])
+            #print("---------")
+
+            #print("contact", self.net_cf.view(self.num_envs, 23, -1)[0])
+            #print("18", self.net_cf.view(self.num_envs, 23, -1)[0][18])
         return self.obs_buf
 
     def reset_idx(self, env_ids):
@@ -650,6 +678,8 @@ class FrankaBox3DInsertion(VecTask):
             u_arm = self._compute_differentiable_inverse_kinematics_torques(dpose=u_arm)
 
         self._arm_control[:, :] = u_arm
+
+       # print("u_arm", u_arm[0])
 
         # Deploy actions
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
