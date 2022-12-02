@@ -533,7 +533,6 @@ class Box3DInsertion(VecTask):
             # torques
             #TODO box_Vel cur should be in joints! not box velocity, mul jacobbian also with this
             actions_dof_tensor = kp @ dpose[..., None, ...] - kv @ box_vel_cur[..., None, ...] #TODO clean make box_vel_cur -> joint_vels!
-            actions_dof_tensor = torch.ones_like(actions_dof_tensor) * 0.2
 
             self.gym.refresh_dof_state_tensor(self.sim)
 
