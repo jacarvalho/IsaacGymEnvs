@@ -88,6 +88,7 @@ class FrankaBox3DInsertion(VecTask):
         self.cfg = cfg
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
         self.observe_force = self.cfg["env"].get("observeForce", False)
+        self.enable_PD_to_goal = self.cfg["env"].get("enable_PD_to_goal", False)
 
         self.goal_position = [0., 0., 0.]
         #self.goal_orientation = [0.7071068, 0.7071068, 0, 0] #xyzw
@@ -104,6 +105,17 @@ class FrankaBox3DInsertion(VecTask):
 
         self.max_delta_pos = self.cfg["env"].get("maxDeltaPosition", np.Inf)
         self.max_delta_orn = self.cfg["env"].get("maxDeltaOrientation", np.Inf)
+
+        self.learn_stiffness = self.cfg["env"]["learnStiffness"]
+        if self.learn_stiffness:
+            self._K_pos_min = self.cfg["env"]["K_pos_min"]
+            self._K_pos_max = self.cfg["env"]["K_pos_max"]
+            self._K_orn_min = self.cfg["env"]["K_orn_min"]
+            self._K_orn_max = self.cfg["env"]["K_orn_max"]
+            self._delta_K_pos = .5 * (self._K_pos_max - self._K_pos_min)
+            self._central_K_pos = .5 * (self._K_pos_max + self._K_pos_min)
+            self._delta_K_orn = .5 * (self._K_orn_max - self._K_orn_min)
+            self._central_K_orn = .5 * (self._K_orn_max + self._K_orn_min)
 
         # Controller type
         self.control_type = self.cfg["env"]["controlType"]
@@ -128,6 +140,9 @@ class FrankaBox3DInsertion(VecTask):
             self.cfg["env"]["numActions"] = 3
         if self.observe_force:
             self.cfg["env"]["numObservations"] += 3
+        if self.learn_stiffness:
+            self.cfg["env"]["numActions"] += 6
+
 
         # Values to be filled in at runtime
         self.states = {}                        # will be dict filled with relevant states to use for reward calculation
@@ -616,7 +631,7 @@ class FrankaBox3DInsertion(VecTask):
 
         return super().reset()
 
-    def _compute_osc_torques(self, dpose, enable_nullspace=True):
+    def _compute_osc_torques(self, dpose, kp, kd, enable_nullspace=True):
         # Solve for Operational Space Control
         # Paper: khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf
         # Helpful resource: studywolf.wordpress.com/2013/09/17/robot-control-4-operation-space-control/
@@ -649,15 +664,89 @@ class FrankaBox3DInsertion(VecTask):
     def _compute_differentiable_inverse_kinematics_torques(self, dpose):
         raise NotImplementedError
 
+    def _create_stiffness_and_damping_matrices(self, actions_K):
+        """
+        actions_K should be [K_pos_x, K_pos_y, K_orn]
+        """
+        # scale values from actions to defined range
+        a_pos = torch.tanh(actions_K[..., 0:3])
+        a_pos_scaled = a_pos * self._delta_K_pos + self._central_K_pos
+        a_orn = torch.tanh(actions_K[..., 3:6])
+        a_orn_scaled = a_orn * self._delta_K_orn + self._central_K_orn
+
+        # print(a_pos_scaled[0], torch.sqrt(a_pos_scaled)[0])
+        # print(a_orn_scaled[0], torch.sqrt(a_orn_scaled)[0])
+
+        # calculate stiffness and damping
+        K_pos_x = a_pos_scaled[..., 0]
+        K_pos_y = a_pos_scaled[..., 1]
+        K_pos_z = a_pos_scaled[..., 1]
+        K_orn_x = a_orn_scaled[..., 0]
+        K_orn_y = a_orn_scaled[..., 1]
+        K_orn_z = a_orn_scaled[..., 2]
+
+        # print(K_pos_x[0], K_pos_y[0], K_orn[0])
+
+        kp = torch.eye(6, device=self.device).reshape((1, 6, 6)).repeat(self.num_envs, 1, 1)
+        kp[..., 0, 0] = K_pos_x
+        kp[..., 1, 1] = K_pos_y
+        kp[..., 2, 2] = K_pos_z
+        kp[..., 3, 3] = K_orn_x
+        kp[..., 4, 4] = K_orn_y
+        kp[..., 5, 5] = K_orn_z
+
+
+        kv = torch.eye(6, device=self.device).reshape((1, 6, 6)).repeat(self.num_envs, 1, 1)
+        if self.control_type == "osc":
+            kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x)
+            kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y)
+            kv[..., 2, 2] = 2 * torch.sqrt(K_pos_z)  # mass is canceled in osc
+            kv[..., 3, 3] = 2 * torch.sqrt(K_orn_x)
+            kv[..., 4, 4] = 2 * torch.sqrt(K_orn_y)
+            kv[..., 5, 5] = 2 * torch.sqrt(K_orn_z)
+        else:
+            # the factors come from the mass matrix and need to be applied to get a stable system
+            kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x*1)
+            kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y*1)
+            kv[..., 2, 2] = 2 * torch.sqrt(K_pos_z*1)
+            kv[..., 3, 3] = 2 * torch.sqrt(K_orn_x*0.01)
+            kv[..., 4, 4] = 2 * torch.sqrt(K_orn_y*0.01)
+            kv[..., 5, 5] = 2 * torch.sqrt(K_orn_z*0.01)
+
+        return kp, kv
+
     def pre_physics_step(self, actions, step=0):
         self.actions = actions.clone().to(self.device)
         delta_pos = self.actions[..., 0:3]*0.05
+
+        # Set (possibly learned) stiffness and damping matrices
+        if self.learn_stiffness:
+            kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 6:12].clone())
+        else:
+            kp = self.kp
+            kv = self.kv
 
         if self.learn_orientations:
             delta_orn = self.actions[..., 3:6]
         else:
             self._refresh()
             delta_orn = orientation_error(self.eef_orn_des, self.states["eef_quat"])
+
+        if self.enable_PD_to_goal:
+            signal_to_goal_pos = -self.states["eef_pos"]
+
+            # clip first the PD signal
+            velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
+            scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
+            # add PD to signal from policy
+            delta_pos += scale_ratio.view(-1, 1) * signal_to_goal_pos
+
+            # clip signal from PD
+            signal_to_goal_orn = orientation_error(self.eef_orn_des, self.states["eef_quat"])
+            velocity_norm = torch.norm(signal_to_goal_orn + 1e-6, p=2, dim=1)
+            scale_ratio = torch.clip(velocity_norm, 0.,
+                                     10.) / velocity_norm
+            delta_orn += scale_ratio.view(-1, 1) * signal_to_goal_orn
 
         # clip delta_pos by norm if larger than max_delta_pos
         delta_pos_norm = torch.norm(delta_pos + 1e-6, p=2, dim=1)
@@ -673,7 +762,7 @@ class FrankaBox3DInsertion(VecTask):
         u_arm = torch.cat([delta_pos, delta_orn], dim=-1)
         # Control arm
         if self.control_type == "osc":
-            u_arm = self._compute_osc_torques(dpose=u_arm, enable_nullspace=True)
+            u_arm = self._compute_osc_torques(dpose=u_arm, kp=kp, kd=kv, enable_nullspace=True)
         else:
             u_arm = self._compute_differentiable_inverse_kinematics_torques(dpose=u_arm)
 

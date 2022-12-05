@@ -67,12 +67,15 @@ def quat_xyzw_to_wxyz(quat_xyzw):
 class Box3DInsertion(VecTask):
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+        self.use_osc = False
 
         self.cfg = cfg
 
         self.observe_force = self.cfg["env"].get("observeForce", False)
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
+
+        self.enable_PD_to_goal = self.cfg["env"].get("enable_PD_to_goal", False)
 
         self.controller_freq = self.cfg["env"].get("controller_freq", None)
         self.recompute_prephysics_step = self.cfg["env"].get("recomputePrePhysicsStep", False)
@@ -101,9 +104,15 @@ class Box3DInsertion(VecTask):
 
         self.control_vel = self.cfg["env"]["controlVelocity"]
         self.learn_stiffness = self.cfg["env"]["learnStiffness"]
-        self.learn_damping = self.cfg["env"].get("learnDamping", False)
-        if self.learn_damping:
-            assert self.learn_stiffness
+        if self.learn_stiffness:
+            self._K_pos_min = self.cfg["env"]["K_pos_min"]
+            self._K_pos_max = self.cfg["env"]["K_pos_max"]
+            self._K_orn_min = self.cfg["env"]["K_orn_min"]
+            self._K_orn_max = self.cfg["env"]["K_orn_max"]
+            self._delta_K_pos = .5 * (self._K_pos_max - self._K_pos_min)
+            self._central_K_pos = .5 * (self._K_pos_max + self._K_pos_min)
+            self._delta_K_orn = .5 * (self._K_orn_max - self._K_orn_min)
+            self._central_K_orn = .5 * (self._K_orn_max + self._K_orn_min)
 
         # Observations
         # All relative to the world
@@ -137,15 +146,11 @@ class Box3DInsertion(VecTask):
         extra_actions = 0
         if not self.observe_orientations:
             if self.learn_stiffness:
-                extra_actions += 4  # parameters of Kpos
-            if self.learn_damping:
-                extra_actions += 4  # parameters of Dpos
+                extra_actions += 3  # parameters of Kpos
             self.cfg["env"]["numActions"] = 3 + extra_actions
         else:
             if self.learn_stiffness:
-                extra_actions += 4 + 1  # parameters of Kpos and Korn
-            if self.learn_damping:
-                extra_actions += 4 + 1  # parameters of Dpos and Dorn
+                extra_actions += 3+3  # parameters of Kpos and Korn
             self.cfg["env"]["numActions"] = 6 + extra_actions
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
@@ -435,6 +440,56 @@ class Box3DInsertion(VecTask):
 
         return super().reset()
 
+    def _create_stiffness_and_damping_matrices(self, actions_K):
+        """
+        actions_K should be [K_pos_x, K_pos_y, K_orn]
+        """
+        # scale values from actions to defined range
+        a_pos = torch.tanh(actions_K[..., 0:3])
+        a_pos_scaled = a_pos * self._delta_K_pos + self._central_K_pos
+        a_orn = torch.tanh(actions_K[..., 3:6])
+        a_orn_scaled = a_orn * self._delta_K_orn + self._central_K_orn
+
+        # print(a_pos_scaled[0], torch.sqrt(a_pos_scaled)[0])
+        # print(a_orn_scaled[0], torch.sqrt(a_orn_scaled)[0])
+
+        # calculate stiffness and damping
+        K_pos_x = a_pos_scaled[..., 0]
+        K_pos_y = a_pos_scaled[..., 1]
+        K_pos_z = a_pos_scaled[..., 1]
+        K_orn_x = a_orn_scaled[..., 0]
+        K_orn_y = a_orn_scaled[..., 1]
+        K_orn_z = a_orn_scaled[..., 2]
+
+        # print(K_pos_x[0], K_pos_y[0], K_orn[0])
+
+        kp = torch.eye(6, device=self.device).reshape((1, 6, 6)).repeat(self.num_envs, 1, 1)
+        kp[..., 0, 0] = K_pos_x
+        kp[..., 1, 1] = K_pos_y
+        kp[..., 2, 2] = K_pos_z
+        kp[..., 3, 3] = K_orn_x
+        kp[..., 4, 4] = K_orn_y
+        kp[..., 5, 5] = K_orn_z
+
+
+        kv = torch.eye(6, device=self.device).reshape((1, 6, 6)).repeat(self.num_envs, 1, 1)
+        if self.use_osc:
+            kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x)
+            kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y)
+            kv[..., 2, 2] = 2 * torch.sqrt(K_pos_z)  # mass is canceled in osc
+            kv[..., 3, 3] = 2 * torch.sqrt(K_orn_x)
+            kv[..., 4, 4] = 2 * torch.sqrt(K_orn_y)
+            kv[..., 5, 5] = 2 * torch.sqrt(K_orn_z)
+        else:
+            # the factors come from the mass matrix and need to be applied to get a stable system
+            kv[..., 0, 0] = 2 * torch.sqrt(K_pos_x*1)
+            kv[..., 1, 1] = 2 * torch.sqrt(K_pos_y*1)
+            kv[..., 2, 2] = 2 * torch.sqrt(K_pos_z*1)
+            kv[..., 3, 3] = 2 * torch.sqrt(K_orn_x*0.01)
+            kv[..., 4, 4] = 2 * torch.sqrt(K_orn_y*0.01)
+            kv[..., 5, 5] = 2 * torch.sqrt(K_orn_z*0.01)
+
+        return kp, kv
 
     def pre_physics_step(self, actions, step=0):
         actions_dof_tensor = torch.zeros((self.num_envs, self.num_dof), device=self.device, dtype=torch.float)
@@ -451,32 +506,11 @@ class Box3DInsertion(VecTask):
             self.gym.refresh_rigid_body_state_tensor(self.sim)
 
             # Set (possibly learned) stiffness and damping matrices
-            kp = self.kp
-            idx = 0
             if self.learn_stiffness:
-                # TODO: Make sure Kpos_orn is positive definite
-                idx = 3 if not self.observe_orientations else 4  # TODO should be 5 since rotate in 2 directions or even 6 for Roll pitch yaw
-                action_kp_pos = actions[:, idx:idx+4]
-                action_kp_pos_matrix = action_kp_pos.reshape(-1, 2, 2)
-                kp[:, :2, :2] = self.kp_pos_factor * torch.bmm(action_kp_pos_matrix, action_kp_pos_matrix.transpose(-2, -1))
-                if self.observe_orientations:
-                    idx += 4
-                    action_kp_orn = actions[:, idx:idx+1]
-                    action_kp_orn_matrix = action_kp_orn.reshape(-1, 1, 1)
-                    kp[:, 2, -1, None, None] = self.kp_orn_factor * torch.bmm(action_kp_orn_matrix, action_kp_orn_matrix.transpose(-2, -1))
-
-            kv = self.kv
-            if self.learn_damping:
-                # TODO: Make sure Dpos_orn is positive definite
-                idx += 1 if self.observe_orientations else 4
-                action_kv_pos = actions[:, idx:idx+4]
-                action_kv_pos_matrix = action_kv_pos.reshape(-1, 2, 2)
-                kv[:, :2, :2] = self.kv_pos_factor * torch.bmm(action_kv_pos_matrix, action_kv_pos_matrix.transpose(-2, -1))
-                if self.observe_orientations:
-                    idx += 4
-                    action_kv_orn = actions[:, idx:idx+1]
-                    action_kv_orn_matrix = action_kv_orn.reshape(-1, 1, 1)
-                    kp[:, 2, -1, None, None] = self.kv_orn_factor * torch.bmm(action_kv_orn_matrix, action_kv_orn_matrix.transpose(-2, -1))
+                kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 6:12].clone())
+            else:
+                kp = self.kp
+                kv = self.kv
 
             # Get current box poses and velocities
             box_pos_cur = self.rb_state[self.box_rb_idxs, :3]
@@ -488,14 +522,28 @@ class Box3DInsertion(VecTask):
                 raise NotImplementedError
 
             # calculate desired linear velocities
+            if self.enable_PD_to_goal:
+                signal_to_goal_pos = -box_pos_cur[:, :3]
 
-            # clip translating actions by norm
-            linear_velocity_norm = torch.norm(actions[:, :3] + 1e-6, p=2, dim=1)
-            linear_scale_ratio = torch.clip(linear_velocity_norm, self.minimum_linear_velocity_norm,
-                                     self.maximum_linear_velocity_norm) / linear_velocity_norm
-            actions[:, :3] = linear_scale_ratio.view(-1, 1) * actions[:, :3]
+                # clip first the PD signal
+                velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
+                scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
+                # add PD to signal from policy
+                pos_err = actions[:, :3] + scale_ratio.view(-1, 1) * signal_to_goal_pos
 
-            pos_err = actions[:, :3]  # position error is equal to the velocities that should be applied
+                # clip linear velocity by norm
+                velocity_norm = torch.norm(pos_err[:, :3] + 1e-6, p=2, dim=1)
+                scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm,
+                                         self.maximum_linear_velocity_norm) / velocity_norm
+                pos_err[:, :3] = scale_ratio.view(-1, 1) * pos_err[:, :3]
+            else:
+                # clip translating actions by norm
+                linear_velocity_norm = torch.norm(actions[:, :3] + 1e-6, p=2, dim=1)
+                linear_scale_ratio = torch.clip(linear_velocity_norm, self.minimum_linear_velocity_norm,
+                                         self.maximum_linear_velocity_norm) / linear_velocity_norm
+                actions[:, :3] = linear_scale_ratio.view(-1, 1) * actions[:, :3]
+
+                pos_err = actions[:, :3]  # position error is equal to the velocities that should be applied
 
             # orientations / angular velocities
             if self.enable_orientations:
@@ -506,13 +554,30 @@ class Box3DInsertion(VecTask):
                     box_orn_des[..., 3] = 1.  # no rotation wrt the base
                     orn_err = orientation_error(box_orn_des, box_orn_cur)
                 else:
-                    # clip rotating actions by norm
-                    angular_velocity_norm = torch.norm(actions[..., 3:6] + 1e-6, p=2, dim=1)
-                    angular_scale_ratio = torch.clip(angular_velocity_norm, self.minimum_angular_velocity_norm,
-                                             self.maximum_angular_velocity_norm) / angular_velocity_norm
-                    actions[..., 3:6] = angular_scale_ratio.view(-1, 1) * actions[..., 3:6]
+                    if self.enable_PD_to_goal:
+                        box_orn_des = torch.zeros_like(box_orn_cur)
+                        box_orn_des[..., 3] = 1.  # no rotation wrt the base
 
-                    orn_err = actions[..., 3:6]
+                        # clip signal from PD
+                        signal_to_goal_orn = orientation_error(box_orn_des, box_orn_cur)
+                        velocity_norm = torch.norm(signal_to_goal_orn + 1e-6, p=2, dim=1)
+                        scale_ratio = torch.clip(velocity_norm, 0.,
+                                                 10.) / velocity_norm
+                        orn_err = actions[..., 3:6] + scale_ratio.view(-1,1) * signal_to_goal_orn
+
+                        # clip angular velocity by norm
+                        velocity_norm = torch.norm(orn_err + 1e-6, p=2, dim=1)
+                        scale_ratio = torch.clip(velocity_norm, self.minimum_angular_velocity_norm,
+                                                 self.maximum_angular_velocity_norm) / velocity_norm
+                        orn_err = scale_ratio.view(-1,1) * orn_err
+                    else:
+                        # clip rotating actions by norm
+                        angular_velocity_norm = torch.norm(actions[..., 3:6] + 1e-6, p=2, dim=1)
+                        angular_scale_ratio = torch.clip(angular_velocity_norm, self.minimum_angular_velocity_norm,
+                                                 self.maximum_angular_velocity_norm) / angular_velocity_norm
+                        actions[..., 3:6] = angular_scale_ratio.view(-1, 1) * actions[..., 3:6]
+
+                        orn_err = actions[..., 3:6]
 
                 error = torch.cat([pos_err, orn_err], -1)
             else:
