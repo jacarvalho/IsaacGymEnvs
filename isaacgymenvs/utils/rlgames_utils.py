@@ -30,11 +30,13 @@ from rl_games.common import env_configurations, vecenv
 from rl_games.common.algo_observer import AlgoObserver
 from rl_games.algos_torch import torch_ext
 from isaacgymenvs.utils.utils import set_seed
-import torch
 import numpy as np
 from typing import Callable
 
 from isaacgymenvs.tasks import isaacgym_task_map
+
+import torch
+
 
 
 def get_rlgames_env_creator(

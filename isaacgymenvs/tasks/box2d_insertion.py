@@ -29,7 +29,6 @@
 import math
 import numpy as np
 import os
-import torch
 import xml.etree.ElementTree as ET
 from typing import *
 
@@ -38,6 +37,9 @@ from isaacgym.torch_utils import *
 from tasks.base.vec_task import VecTask
 from gym import spaces
 import pytorch_kinematics as pk
+
+import torch
+
 
 @torch.jit.script
 def orientation_error(desired, current):
