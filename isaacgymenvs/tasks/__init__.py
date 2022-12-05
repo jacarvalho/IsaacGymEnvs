@@ -27,28 +27,29 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from .ant import Ant
-from .anymal import Anymal
-from .anymal_terrain import AnymalTerrain
-from .ball_balance import BallBalance
+# from .ant import Ant
+# from .anymal import Anymal
+# from .anymal_terrain import AnymalTerrain
+# from .ball_balance import BallBalance
+# from .cartpole import Cartpole
+# from .factory.factory_task_gears import FactoryTaskGears
+# from .factory.factory_task_insertion import FactoryTaskInsertion
+# from .factory.factory_task_nut_bolt_pick import FactoryTaskNutBoltPick
+# from .factory.factory_task_nut_bolt_place import FactoryTaskNutBoltPlace
+# from .factory.factory_task_nut_bolt_screw import FactoryTaskNutBoltScrew
+# from .franka_cabinet import FrankaCabinet
+# from .franka_cube_stack import FrankaCubeStack
+# from .humanoid import Humanoid
+# from .humanoid_amp import HumanoidAMP
+# from .ingenuity import Ingenuity
+# from .quadcopter import Quadcopter
+# from .shadow_hand import ShadowHand
+# from .allegro_hand import AllegroHand
+# from .trifinger import Trifinger
+
 from .box2d_insertion import Box2DInsertion
 from .box3d_insertion_franka import FrankaBox3DInsertion
 from .box3d_insertion import Box3DInsertion
-from .cartpole import Cartpole 
-from .factory.factory_task_gears import FactoryTaskGears
-from .factory.factory_task_insertion import FactoryTaskInsertion
-from .factory.factory_task_nut_bolt_pick import FactoryTaskNutBoltPick
-from .factory.factory_task_nut_bolt_place import FactoryTaskNutBoltPlace
-from .factory.factory_task_nut_bolt_screw import FactoryTaskNutBoltScrew
-from .franka_cabinet import FrankaCabinet
-from .franka_cube_stack import FrankaCubeStack
-from .humanoid import Humanoid
-from .humanoid_amp import HumanoidAMP
-from .ingenuity import Ingenuity
-from .quadcopter import Quadcopter
-from .shadow_hand import ShadowHand
-from .allegro_hand import AllegroHand
-from .trifinger import Trifinger
 
 # Mappings from strings to environments
 isaacgym_task_map = {
