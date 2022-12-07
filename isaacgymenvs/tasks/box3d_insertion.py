@@ -182,7 +182,7 @@ class Box3DInsertion(VecTask):
         self.kp_pos_factor = 100.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
-            self.kp_orn_factor = 20.
+            self.kp_orn_factor = 25.
             self.kp[:, 3:6, 3:6] = self.kp_orn_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
 
         self.enable_damping_term = self.cfg["env"]["enableDampingTerm"]
@@ -528,19 +528,19 @@ class Box3DInsertion(VecTask):
                 signal_to_goal_pos = -box_pos_cur[:, :3]
 
                 # clip first the PD signal
-                velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
+                velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
                 scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
                 # add PD to signal from policy
                 pos_err = actions[:, :3] + scale_ratio.view(-1, 1) * signal_to_goal_pos
 
                 # clip linear velocity by norm
-                velocity_norm = torch.norm(pos_err[:, :3] + 1e-6, p=2, dim=1)
+                velocity_norm = torch.linalg.vector_norm(pos_err[:, :3] + 1e-6, dim=1, ord=np.inf)
                 scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm,
                                          self.maximum_linear_velocity_norm) / velocity_norm
                 pos_err[:, :3] = scale_ratio.view(-1, 1) * pos_err[:, :3]
             else:
                 # clip translating actions by norm
-                linear_velocity_norm = torch.norm(actions[:, :3] + 1e-6, p=2, dim=1)
+                linear_velocity_norm = torch.linalg.vector_norm(actions[:, :3] + 1e-6, dim=1, ord=np.inf)
                 linear_scale_ratio = torch.clip(linear_velocity_norm, self.minimum_linear_velocity_norm,
                                          self.maximum_linear_velocity_norm) / linear_velocity_norm
                 actions[:, :3] = linear_scale_ratio.view(-1, 1) * actions[:, :3]
@@ -562,19 +562,19 @@ class Box3DInsertion(VecTask):
 
                         # clip signal from PD
                         signal_to_goal_orn = orientation_error(box_orn_des, box_orn_cur)
-                        velocity_norm = torch.norm(signal_to_goal_orn + 1e-6, p=2, dim=1)
+                        velocity_norm = torch.linalg.vector_norm(signal_to_goal_orn + 1e-6, dim=1, ord=np.inf)
                         scale_ratio = torch.clip(velocity_norm, 0.,
                                                  10.) / velocity_norm
                         orn_err = actions[..., 3:6] + scale_ratio.view(-1,1) * signal_to_goal_orn
 
                         # clip angular velocity by norm
-                        velocity_norm = torch.norm(orn_err + 1e-6, p=2, dim=1)
+                        velocity_norm = torch.linalg.vector_norm(orn_err + 1e-6, dim=1, ord=np.inf)
                         scale_ratio = torch.clip(velocity_norm, self.minimum_angular_velocity_norm,
                                                  self.maximum_angular_velocity_norm) / velocity_norm
                         orn_err = scale_ratio.view(-1,1) * orn_err
                     else:
                         # clip rotating actions by norm
-                        angular_velocity_norm = torch.norm(actions[..., 3:6] + 1e-6, p=2, dim=1)
+                        angular_velocity_norm = torch.linalg.vector_norm(actions[..., 3:6] + 1e-6, dim=1, ord=np.inf)
                         angular_scale_ratio = torch.clip(angular_velocity_norm, self.minimum_angular_velocity_norm,
                                                  self.maximum_angular_velocity_norm) / angular_velocity_norm
                         actions[..., 3:6] = angular_scale_ratio.view(-1, 1) * actions[..., 3:6]
@@ -673,11 +673,11 @@ def compute_box3d_insertion_reward(
             orn_error[..., 2] * orn_error[..., 2]
         )
     if reward_orientations:
-        reward -= box_orn_dist / np.pi
+        reward -= (box_orn_dist / np.pi) *5
 
-    condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.05)
+    condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.1)
     if enable_orientations:
-        condition = torch.logical_or(progress_buf >= max_episode_length - 1, torch.logical_and(box_pos_dist < 0.05, box_orn_dist < 0.05))
+        condition = torch.logical_or(progress_buf >= max_episode_length - 1, torch.logical_and(box_pos_dist < 0.1, box_orn_dist < 0.05))
 
     reset = torch.where(condition, torch.ones_like(reset_buf), reset_buf)
 

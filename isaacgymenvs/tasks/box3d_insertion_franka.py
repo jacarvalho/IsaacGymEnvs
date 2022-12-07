@@ -725,7 +725,7 @@ class FrankaBox3DInsertion(VecTask):
             kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 6:12].clone())
         else:
             kp = self.kp
-            kv = self.kv
+            kv = self.kd
 
         if self.learn_orientations:
             delta_orn = self.actions[..., 3:6]
@@ -737,25 +737,25 @@ class FrankaBox3DInsertion(VecTask):
             signal_to_goal_pos = -self.states["eef_pos"]
 
             # clip first the PD signal
-            velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
+            velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
             scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
             # add PD to signal from policy
             delta_pos += scale_ratio.view(-1, 1) * signal_to_goal_pos
 
             # clip signal from PD
             signal_to_goal_orn = orientation_error(self.eef_orn_des, self.states["eef_quat"])
-            velocity_norm = torch.norm(signal_to_goal_orn + 1e-6, p=2, dim=1)
+            velocity_norm = torch.linalg.vector_norm(signal_to_goal_orn + 1e-6, dim=1, ord=np.inf)
             scale_ratio = torch.clip(velocity_norm, 0.,
                                      10.) / velocity_norm
             delta_orn += scale_ratio.view(-1, 1) * signal_to_goal_orn
 
         # clip delta_pos by norm if larger than max_delta_pos
-        delta_pos_norm = torch.norm(delta_pos + 1e-6, p=2, dim=1)
+        delta_pos_norm = torch.linalg.vector_norm(delta_pos + 1e-6, dim=1, ord=np.inf)
         delta_pos_scale_ratio = torch.clip(delta_pos_norm, 0.0, self.max_delta_pos) / delta_pos_norm
         delta_pos = delta_pos_scale_ratio.view(-1, 1) * delta_pos
 
         # clip delta_orn by norm if larger than max_delta_orn
-        delta_orn_norm = torch.norm(delta_orn + 1e-6, p=2, dim=1)
+        delta_orn_norm = torch.linalg.vector_norm(delta_orn + 1e-6, dim=1, ord=np.inf)
         delta_orn_scale_ratio = torch.clip(delta_orn_norm, 0.0, self.max_delta_orn) / delta_orn_norm
         delta_orn = delta_orn_scale_ratio.view(-1, 1) * delta_orn
 
@@ -889,9 +889,9 @@ def compute_insertion_reward(
         orn_error[..., 2] * orn_error[..., 2]
     )
     if reward_orientations:
-        reward -= ee_orn_dist / np.pi  # scale the error to be in 0 to 1
+        reward -= (ee_orn_dist / np.pi) * 5  # scale the error to be in 0 to 1
 
-    max_pos_dist = 0.01
+    max_pos_dist = 0.025
     max_orn_dist = 3.14159 / 180. * 5. # equals 5 degrees
     condition = torch.logical_or(progress_buf >= max_episode_length - 1, torch.logical_and(torch.abs(pos_error).max(dim=1)[0] < max_pos_dist, torch.abs(orn_error).max(dim=1)[0] < max_orn_dist))
 

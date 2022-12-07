@@ -154,7 +154,7 @@ class Box2DInsertion(VecTask):
         # Default IC stiffness and damping
         # 2 prismatic joints + 1 revolute joint
         self.kp = torch.zeros((self.num_envs, 3, 3), device=self.device)
-        self.kp_pos_factor = 50.
+        self.kp_pos_factor = 100.
         self.kp[:, :3, :3] = self.kp_pos_factor * torch.eye(3).reshape((1, 3, 3)).repeat(self.num_envs, 1, 1)
         if self.enable_orientations:
             self.kp_orn_factor = 25.
@@ -494,19 +494,20 @@ class Box2DInsertion(VecTask):
                 if self.enable_PD_to_goal:
                     signal_to_goal_pos = -box_pos_cur[:, :2]
                     #clip first the PD signal
-                    velocity_norm = torch.norm(signal_to_goal_pos + 1e-6, p=2, dim=1)
+                    velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
                     scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
                     # add PD to signal from policy
-                    pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
+                    #pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
+                    pos_err = scale_ratio.view(-1,1) * signal_to_goal_pos
 
                     # clip linear velocity by norm
-                    velocity_norm = torch.norm(pos_err[:, :2] + 1e-6, p=2, dim=1)
+                    velocity_norm = torch.linalg.vector_norm(pos_err[:, :2] + 1e-6, dim=1, ord=np.inf)
                     scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm,
                                              self.maximum_linear_velocity_norm) / velocity_norm
                     pos_err[:, :2] = scale_ratio.view(-1, 1) * pos_err[:, :2]
                 else:
                     # clip linear velocity by norm
-                    velocity_norm = torch.norm(actions[:, :2] + 1e-6, p=2, dim=1)
+                    velocity_norm = torch.linalg.vector_norm(actions[:, :2] + 1e-6, dim=1, ord=np.inf)
                     scale_ratio = torch.clip(velocity_norm, self.minimum_linear_velocity_norm, self.maximum_linear_velocity_norm) / velocity_norm
                     actions[:, :2] = scale_ratio.view(-1, 1) * actions[:, :2]
 
@@ -537,7 +538,8 @@ class Box2DInsertion(VecTask):
                             velocity_norm = torch.abs(signal_to_goal_orn[:, 2] + 1e-6)
                             scale_ratio = torch.clip(velocity_norm, 0.,
                                                      10.) / velocity_norm
-                            orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
+                            #orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
+                            orn_err[:, 2] = scale_ratio * signal_to_goal_orn[:, 2]
 
                             # clip angular velocity by norm
                             velocity_norm = torch.abs(orn_err[:, 2] + 1e-6)
@@ -667,11 +669,14 @@ def compute_box2d_insertion_reward(
     box_orn_dist = torch.zeros_like(box_pos_dist)
     if enable_orientations:
         # get angle around z-axis which is yaw
-        roll, pitch, yaw = get_euler_xyz(box_orientation)
-        box_orn_dist = yaw
-        box_orn_dist /= 2*np.pi  # scale reward to be in [0,-1]
+        box_orn_des = torch.zeros_like(box_orientation)
+        box_orn_des[..., 3] = 1.  # no rotation wrt the base
+        orn_err = orientation_error(box_orn_des, box_orientation)
+        box_orn_dist = torch.sqrt(
+            orn_err[..., 2] * orn_err[..., 2]
+        )
     if reward_orientations:
-        reward -= box_orn_dist
+        reward -= box_orn_dist * 5
 
     condition = torch.logical_or(progress_buf >= max_episode_length - 1, box_pos_dist < 0.05)
     if enable_orientations:
