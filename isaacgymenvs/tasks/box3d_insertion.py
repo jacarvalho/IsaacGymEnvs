@@ -170,6 +170,8 @@ class Box3DInsertion(VecTask):
             sensors_per_env = 1
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
+            _net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
+            self.contact_sensor_tensor = gymtorch.wrap_tensor(_net_cf)
             #dof_sensor_tensor = self.gym.acquire_dof_force_tensor(self.sim)
             #self.dof_forces = gymtorch.wrap_tensor(dof_sensor_tensor).view(self.num_envs, 6)
 
@@ -376,18 +378,11 @@ class Box3DInsertion(VecTask):
                 self.obs_buf[env_ids, 15:18] = box_angluar_velocity[:, 0:3]  # box angular velocity
 
         if self.observe_force:
-            self.gym.refresh_force_sensor_tensor(self.sim)
-            self.obs_buf[env_ids, -3:] = self.vec_sensor_tensor[env_ids, 0:3]
+            #self.gym.refresh_force_sensor_tensor(self.sim)
+            #self.obs_buf[env_ids, -3:] = self.vec_sensor_tensor[env_ids, 0:3]
 
-           # test = torch.transpose(self.robot.jacobian(self.dof_pos), 1, 2) @ self.vec_sensor_tensor.view(-1, 6, 1)
-
-            #self.gym.refresh_dof_force_tensor(self.sim)
-
-            #print("alternative dof force", self.gym.get_actor_dof_forces(self.envs[0], self.actor_handles[0]))
-            #print("dof force", self.dof_forces[0])
-            #print("force", self.vec_sensor_tensor[0])
-            #print("test", test[0])
-            #print("----------------")
+            self.gym.refresh_net_contact_force_tensor(self.sim)
+            self.obs_buf[env_ids, -3:] = self.contact_sensor_tensor[self.box_rb_idxs][env_ids, 0:3]
 
         return self.obs_buf
 

@@ -189,8 +189,8 @@ class FrankaBox3DInsertion(VecTask):
             sensors_per_env = 1
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
-            #_net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
-            #self.net_cf = gymtorch.wrap_tensor(_net_cf)
+            _net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
+            self.contact_sensor_tensor = gymtorch.wrap_tensor(_net_cf)
 
             #dof_sensor_tensor = self.gym.acquire_dof_force_tensor(self.sim)
             #self.dof_forces = gymtorch.wrap_tensor(dof_sensor_tensor).view(self.num_envs, 7)
@@ -569,18 +569,10 @@ class FrankaBox3DInsertion(VecTask):
         if self.observe_force:
             self.gym.refresh_force_sensor_tensor(self.sim)
             self.obs_buf = torch.cat((self.obs_buf, self.vec_sensor_tensor[..., 0:3]), dim=1)
-            #print(self.vec_sensor_tensor[..., 0:3][0])
 
-            #test = torch.transpose(self._j_eef, 1, 2) @ self.vec_sensor_tensor.view(-1, 6, 1)
-            #print("obs", test[0])
-            #self.gym.refresh_net_contact_force_tensor(self.sim)
+            self.gym.refresh_net_contact_force_tensor(self.sim)
+            self.obs_buf[..., -3:] = self.contact_sensor_tensor[self.handles["insertion_obj"]][..., 0:3] / 150.
 
-            #self.gym.refresh_dof_force_tensor(self.sim)
-            #print("dof force", self.dof_forces[0])
-            #print("---------")
-
-            #print("contact", self.net_cf.view(self.num_envs, 23, -1)[0])
-            #print("18", self.net_cf.view(self.num_envs, 23, -1)[0][18])
         return self.obs_buf
 
     def reset_idx(self, env_ids):

@@ -144,6 +144,9 @@ class Box2DInsertion(VecTask):
             sensors_per_env = 1
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
+            _net_cf = self.gym.acquire_net_contact_force_tensor(self.sim)
+            self.contact_sensor_tensor = gymtorch.wrap_tensor(_net_cf)
+
             #dof_sensor_tensor = self.gym.acquire_dof_force_tensor(self.sim)
             #self.dof_forces = gymtorch.wrap_tensor(dof_sensor_tensor).view(self.num_envs, 3)
             #self.first = True
@@ -332,11 +335,13 @@ class Box2DInsertion(VecTask):
                 self.obs_buf[env_ids, 6:8] = box_angluar_velocity[:, 0:2]  # box angular velocity
 
         if self.observe_force:
-            self.gym.refresh_force_sensor_tensor(self.sim)
-            vec_force = torch.zeros_like(self.obs_buf[..., -2:])
-            vec_force[..., 0:2] = self.vec_sensor_tensor[..., 0:2]
-            self.obs_buf[env_ids, -2:] = vec_force[env_ids]
-            #print(self.vec_sensor_tensor[0])
+            #self.gym.refresh_force_sensor_tensor(self.sim)
+            #vec_force = torch.zeros_like(self.obs_buf[..., -2:])
+            #vec_force[..., 0:2] = self.vec_sensor_tensor[..., 0:2]
+            #self.obs_buf[env_ids, -2:] = vec_force[env_ids]
+
+            self.gym.refresh_net_contact_force_tensor(self.sim)
+            self.obs_buf[env_ids, -2:] = self.contact_sensor_tensor[self.box_rb_idxs][env_ids, 0:2] / 50.
 
         return self.obs_buf
 
