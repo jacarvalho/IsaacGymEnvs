@@ -495,10 +495,9 @@ class Box2DInsertion(VecTask):
                     signal_to_goal_pos = -box_pos_cur[:, :2]
                     #clip first the PD signal
                     velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
-                    scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
+                    scale_ratio = torch.clip(velocity_norm, 0., self.maximum_linear_velocity_norm) / velocity_norm
                     # add PD to signal from policy
-                    #pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
-                    pos_err = scale_ratio.view(-1,1) * signal_to_goal_pos
+                    pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
 
                     # clip linear velocity by norm
                     velocity_norm = torch.linalg.vector_norm(pos_err[:, :2] + 1e-6, dim=1, ord=np.inf)
@@ -537,9 +536,8 @@ class Box2DInsertion(VecTask):
                             signal_to_goal_orn = orientation_error(box_orn_des, box_orn_cur)
                             velocity_norm = torch.abs(signal_to_goal_orn[:, 2] + 1e-6)
                             scale_ratio = torch.clip(velocity_norm, 0.,
-                                                     10.) / velocity_norm
-                            #orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
-                            orn_err[:, 2] = scale_ratio * signal_to_goal_orn[:, 2]
+                                                     self.maximum_angular_velocity_norm) / velocity_norm
+                            orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
 
                             # clip angular velocity by norm
                             velocity_norm = torch.abs(orn_err[:, 2] + 1e-6)

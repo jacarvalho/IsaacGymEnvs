@@ -738,15 +738,14 @@ class FrankaBox3DInsertion(VecTask):
 
             # clip first the PD signal
             velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
-            scale_ratio = torch.clip(velocity_norm, 0., 10.) / velocity_norm
+            scale_ratio = torch.clip(velocity_norm, 0., self.max_delta_pos) / velocity_norm
             # add PD to signal from policy
             delta_pos += scale_ratio.view(-1, 1) * signal_to_goal_pos
 
             # clip signal from PD
             signal_to_goal_orn = orientation_error(self.eef_orn_des, self.states["eef_quat"])
             velocity_norm = torch.linalg.vector_norm(signal_to_goal_orn + 1e-6, dim=1, ord=np.inf)
-            scale_ratio = torch.clip(velocity_norm, 0.,
-                                     10.) / velocity_norm
+            scale_ratio = torch.clip(velocity_norm, 0., self.max_delta_orn) / velocity_norm
             delta_orn += scale_ratio.view(-1, 1) * signal_to_goal_orn
 
         # clip delta_pos by norm if larger than max_delta_pos
