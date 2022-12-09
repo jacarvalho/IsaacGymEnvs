@@ -110,6 +110,12 @@ class FrankaBox3DInsertion(VecTask):
         self.max_delta_orn = self.cfg["env"].get("maxDeltaOrientation", np.Inf)
 
         self.learn_stiffness = self.cfg["env"]["learnStiffness"]
+
+        self.just_learn_stiffness = self.cfg["env"].get("justLearnStiffness", False)
+        if self.just_learn_stiffness:
+            self.enable_PD_to_goal = True
+            self.learn_stiffness = True
+
         if self.learn_stiffness:
             self._K_pos_min = self.cfg["env"]["K_pos_min"]
             self._K_pos_max = self.cfg["env"]["K_pos_max"]
@@ -149,6 +155,8 @@ class FrankaBox3DInsertion(VecTask):
         if self.learn_stiffness:
             self.cfg["env"]["numActions"] += 6
 
+        if self.just_learn_stiffness:
+            self.cfg["env"]["numActions"] = 6
 
         # Values to be filled in at runtime
         self.states = {}                        # will be dict filled with relevant states to use for reward calculation
@@ -719,7 +727,10 @@ class FrankaBox3DInsertion(VecTask):
 
         # Set (possibly learned) stiffness and damping matrices
         if self.learn_stiffness:
-            kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 6:12].clone())
+            if self.just_learn_stiffness:
+                kp, kv = self._create_stiffness_and_damping_matrices(actions.clone())
+            else:
+                kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 6:12].clone())
         else:
             kp = self.kp
             kv = self.kd
@@ -737,13 +748,19 @@ class FrankaBox3DInsertion(VecTask):
             velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
             scale_ratio = torch.clip(velocity_norm, 0., self.max_delta_pos) / velocity_norm
             # add PD to signal from policy
-            delta_pos += scale_ratio.view(-1, 1) * signal_to_goal_pos
+            if self.just_learn_stiffness:
+                delta_pos = scale_ratio.view(-1, 1) * signal_to_goal_pos
+            else:
+                delta_pos += scale_ratio.view(-1, 1) * signal_to_goal_pos
 
             # clip signal from PD
             signal_to_goal_orn = orientation_error(self.eef_orn_des, self.states["eef_quat"])
             velocity_norm = torch.linalg.vector_norm(signal_to_goal_orn + 1e-6, dim=1, ord=np.inf)
             scale_ratio = torch.clip(velocity_norm, 0., self.max_delta_orn) / velocity_norm
-            delta_orn += scale_ratio.view(-1, 1) * signal_to_goal_orn
+            if self.just_learn_stiffness:
+                delta_orn = scale_ratio.view(-1, 1) * signal_to_goal_orn
+            else:
+                delta_orn += scale_ratio.view(-1, 1) * signal_to_goal_orn
 
         # clip delta_pos by norm if larger than max_delta_pos
         delta_pos_norm = torch.linalg.vector_norm(delta_pos + 1e-6, dim=1, ord=np.inf)

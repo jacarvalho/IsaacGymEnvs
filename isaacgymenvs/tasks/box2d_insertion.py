@@ -517,9 +517,7 @@ class Box2DInsertion(VecTask):
                     scale_ratio = torch.clip(velocity_norm, 0., self.maximum_linear_velocity_norm) / velocity_norm
                     # add PD to signal from policy
                     if self.just_learn_stiffness:
-                        #pos_err = scale_ratio.view(-1, 1) * signal_to_goal_pos
-                        pos_err = torch.ones_like(signal_to_goal_pos)*torch.sign(signal_to_goal_pos) *self.maximum_linear_velocity_norm
-
+                        pos_err = scale_ratio.view(-1, 1) * signal_to_goal_pos
                     else:
                         pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
 
