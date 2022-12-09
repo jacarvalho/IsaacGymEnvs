@@ -90,7 +90,8 @@ class Box3DInsertion(VecTask):
         self.maximum_angular_velocity_norm = self.cfg["env"].get("maximum_angular_velocity_norm", 1.)
 
         self.observe_velocities = self.cfg['env']['enableVelocityState']
-        self.observe_orientations = self.cfg["env"]["learnOrientations"]
+        self.learn_orientations = self.cfg["env"]["learnOrientations"]
+        self.observe_orientations = self.cfg["env"].get("observeOrientations", True)
 
         if self.observe_orientations:
             self.observe_joint_angles = self.cfg["env"]["observeJointAngles"]
@@ -146,7 +147,7 @@ class Box3DInsertion(VecTask):
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
-        if not self.observe_orientations:
+        if not self.learn_orientations:
             if self.learn_stiffness:
                 extra_actions += 3  # parameters of Kpos
             self.cfg["env"]["numActions"] = 3 + extra_actions
@@ -493,7 +494,7 @@ class Box3DInsertion(VecTask):
 
         if not self.enable_ic:
             # Direct control
-            if not self.observe_orientations:
+            if not self.learn_orientations:
                 actions_dof_tensor[:, :2] = actions.to(self.device).squeeze()
             else:
                 actions_dof_tensor = actions.to(self.device).squeeze()
@@ -544,7 +545,7 @@ class Box3DInsertion(VecTask):
 
             # orientations / angular velocities
             if self.enable_orientations:
-                if not self.observe_orientations:
+                if not self.learn_orientations:
                     # Orientation is not part of the policy output. The desired oritentation is set to the final one.
                     # control the angle
                     box_orn_des = torch.zeros_like(box_orn_cur)

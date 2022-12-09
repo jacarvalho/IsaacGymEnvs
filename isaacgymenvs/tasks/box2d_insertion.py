@@ -74,7 +74,16 @@ class Box2DInsertion(VecTask):
         self.maximum_angular_velocity_norm = self.cfg["env"].get("maximum_angular_velocity_norm", 1.)
 
         self.observe_velocities = self.cfg['env']['enableVelocityState']
-        self.observe_orientations = self.cfg["env"]["learnOrientations"]
+        self.learn_orientations = self.cfg["env"]["learnOrientations"]
+        self.observe_orientations = self.cfg["env"].get("observeOrientations", True)
+
+        self.learn_stiffness = self.cfg["env"]["learnStiffness"]
+
+
+        self.just_learn_stiffness = self.cfg["env"].get("justLearnStiffness", False)
+        if self.just_learn_stiffness:
+            self.enable_PD_to_goal = True
+            self.learn_stiffness = True
 
         self.enable_orientations = self.cfg["env"]["enableOrientations"]
         self.enable_ic = self.cfg["env"]["enableIC"]
@@ -83,7 +92,6 @@ class Box2DInsertion(VecTask):
         if not self.control_vel:
             raise NotImplementedError
 
-        self.learn_stiffness = self.cfg["env"]["learnStiffness"]
         if self.learn_stiffness:
             self._K_pos_min = self.cfg["env"]["K_pos_min"]
             self._K_pos_max = self.cfg["env"]["K_pos_max"]
@@ -119,7 +127,7 @@ class Box2DInsertion(VecTask):
 
         # Action is the desired velocity on the 3 joints representing the dofs (2 prismatic + 1 revolute)
         extra_actions = 0
-        if not self.observe_orientations:
+        if not self.learn_orientations:
             if self.learn_stiffness:
                 extra_actions += 2  # parameters of Kpos
             self.cfg["env"]["numActions"] = 2 + extra_actions
@@ -128,6 +136,9 @@ class Box2DInsertion(VecTask):
             if self.learn_stiffness:
                 extra_actions += 2 + 1  # parameters of Kpos and Korn
             self.cfg["env"]["numActions"] = 2 + extra_actions
+
+        if self.just_learn_stiffness:
+            self.cfg["env"]["numActions"] = 3
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
 
@@ -468,7 +479,7 @@ class Box2DInsertion(VecTask):
 
         if not self.enable_ic:
             # Direct control
-            if not self.observe_orientations:
+            if not self.learn_orientations:
                 actions_dof_tensor[:, :2] = actions.to(self.device).squeeze()
             else:
                 actions_dof_tensor = actions.to(self.device).squeeze()
@@ -481,7 +492,10 @@ class Box2DInsertion(VecTask):
             # Set (possibly learned) stiffness and damping matrices
 
             if self.learn_stiffness:
-                kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 3:6].clone())
+                if self.just_learn_stiffness:
+                    kp, kv = self._create_stiffness_and_damping_matrices(actions.clone())
+                else:
+                    kp, kv = self._create_stiffness_and_damping_matrices(actions[..., 3:6].clone())
             else:
                 kp = self.kp
                 kv = self.kv
@@ -502,7 +516,12 @@ class Box2DInsertion(VecTask):
                     velocity_norm = torch.linalg.vector_norm(signal_to_goal_pos + 1e-6, dim=1, ord=np.inf)
                     scale_ratio = torch.clip(velocity_norm, 0., self.maximum_linear_velocity_norm) / velocity_norm
                     # add PD to signal from policy
-                    pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
+                    if self.just_learn_stiffness:
+                        #pos_err = scale_ratio.view(-1, 1) * signal_to_goal_pos
+                        pos_err = torch.ones_like(signal_to_goal_pos)*torch.sign(signal_to_goal_pos) *self.maximum_linear_velocity_norm
+
+                    else:
+                        pos_err = actions[:, :2] + scale_ratio.view(-1,1) * signal_to_goal_pos
 
                     # clip linear velocity by norm
                     velocity_norm = torch.linalg.vector_norm(pos_err[:, :2] + 1e-6, dim=1, ord=np.inf)
@@ -521,12 +540,20 @@ class Box2DInsertion(VecTask):
             if not self.enable_orientations:
                 raise NotImplementedError
             else:
-                if not self.observe_orientations:
+                if not self.learn_orientations:
                     # Orientation is not part of the policy output. The desired orientation is set to the final one.
                     # control the angle
+                    orn_err = torch.zeros_like(box_ang_vel_cur)
+
                     box_orn_des = torch.zeros_like(box_orn_cur)
                     box_orn_des[..., 3] = 1.  # no rotation wrt the base
-                    orn_err = orientation_error(box_orn_des, box_orn_cur)
+
+                    # clip signal from PD
+                    signal_to_goal_orn = orientation_error(box_orn_des, box_orn_cur)
+                    velocity_norm = torch.abs(signal_to_goal_orn[:, 2] + 1e-6)
+                    scale_ratio = torch.clip(velocity_norm, 0.,
+                                             self.maximum_angular_velocity_norm) / velocity_norm
+                    orn_err[:, 2] = scale_ratio * signal_to_goal_orn[:, 2]
                 else:
                     if not self.control_vel:
                         raise NotImplementedError
@@ -542,7 +569,10 @@ class Box2DInsertion(VecTask):
                             velocity_norm = torch.abs(signal_to_goal_orn[:, 2] + 1e-6)
                             scale_ratio = torch.clip(velocity_norm, 0.,
                                                      self.maximum_angular_velocity_norm) / velocity_norm
-                            orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
+                            if self.just_learn_stiffness:
+                                orn_err[:, 2] = scale_ratio * signal_to_goal_orn[:, 2]
+                            else:
+                                orn_err[:, 2] = actions[:, 2] + scale_ratio * signal_to_goal_orn[:, 2]
 
                             # clip angular velocity by norm
                             velocity_norm = torch.abs(orn_err[:, 2] + 1e-6)

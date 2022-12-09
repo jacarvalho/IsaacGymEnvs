@@ -98,6 +98,8 @@ class FrankaBox3DInsertion(VecTask):
         self.controller_freq = self.cfg["env"].get("controller_freq", None)
         self.enable_sparse_reward = self.cfg["env"]["enableSparseReward"]  # if set to True, reward is for each action -1
         self.learn_orientations = self.cfg["env"]["learnOrientations"]  # if set to True, orientation is controlled by agent, if False by PD controller
+        self.observe_orientations = self.cfg["env"].get("observeOrientations", True)
+
 
         self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
         self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
@@ -129,11 +131,14 @@ class FrankaBox3DInsertion(VecTask):
             "Invalid control type specified. Must be one of: {pos_and_quat, pos_and_rotMat}"
 
         # Dimensions
-        if self.learn_orientations:
+        if self.observe_orientations:
             # Observations include: EEF_pose 7 = 3 position + 4 quaternion of rotation OR 12 = 3 position + 3*3 Rotation matrix
             self.cfg["env"]["numObservations"] = 7 if self.observation_type == "pos_and_quat" else 12
             # Actions include: delta EEF in World Space - 6 = 3 position + 3 rotation (axis angle)
-            self.cfg["env"]["numActions"] = 6
+            if self.learn_orientations:
+                self.cfg["env"]["numActions"] = 6
+            else:
+                self.cfg["env"]["numActions"] = 3
         else:
             # Observations include: EEF_position -> 3
             self.cfg["env"]["numObservations"] = 3
@@ -540,7 +545,7 @@ class FrankaBox3DInsertion(VecTask):
     def compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:] = compute_insertion_reward(
             self.states["eef_pos"], self.states["eef_quat"], self.eef_pos_des, self.eef_orn_des, self.reset_buf, self.progress_buf, self.max_episode_length,
-            enable_sparse_reward=self.enable_sparse_reward, reward_orientations=self.learn_orientations
+            enable_sparse_reward=self.enable_sparse_reward, reward_orientations=self.observe_orientations
         )
 
     def _process_states_for_observations(self, states):
@@ -555,7 +560,7 @@ class FrankaBox3DInsertion(VecTask):
 
         eef_pos, eef_quat_wxyz = self._process_states_for_observations(self.states)
 
-        if not self.learn_orientations:
+        if not self.observe_orientations:
             self.obs_buf = eef_pos
         else:
             if self.observation_type == "pos_and_rotMat":
