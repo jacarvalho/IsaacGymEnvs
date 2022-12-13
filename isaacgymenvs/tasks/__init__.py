@@ -50,6 +50,8 @@
 from .box2d_insertion import Box2DInsertion
 from .box3d_insertion_franka import FrankaBox3DInsertion
 from .box3d_insertion import Box3DInsertion
+from .ubongo_franka import FrankaUbongo
+from .ubongo_insertion import UbongoInsertion
 
 # Mappings from strings to environments
 isaacgym_task_map = {
@@ -74,6 +76,8 @@ isaacgym_task_map = {
     # "Trifinger": Trifinger,
     "Box2DInsertion": Box2DInsertion,
     "FrankaBox3DInsertion": FrankaBox3DInsertion,
-    "Box3DInsertion": Box3DInsertion
+    "Box3DInsertion": Box3DInsertion,
+    "UbongoInsertion": UbongoInsertion,
+    "FrankaUbongo": FrankaUbongo
 
 }
