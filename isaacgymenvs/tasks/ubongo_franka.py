@@ -287,8 +287,8 @@ class FrankaUbongo(VecTask):
         table_asset = self.gym.create_box(self.sim, *[1.2, 1.2, table_thickness], table_opts)
 
         # Create table stand asset
-        table_stand_height = 0.1
-        table_stand_pos = [-0.7, 0.0,  --ubongo_cube_size-ubongo_cube_size/2 + table_stand_height / 2]
+        table_stand_height = 0.05
+        table_stand_pos = [-0.7, 0.0,  -ubongo_cube_size-ubongo_cube_size/2]
         table_stand_opts = gymapi.AssetOptions()
         table_stand_opts.fix_base_link = True
         table_stand_asset = self.gym.create_box(self.sim, *[0.2, 0.2, table_stand_height], table_opts)
@@ -337,7 +337,7 @@ class FrankaUbongo(VecTask):
         # Define start pose for franka
         franka_offset = -0.65
         franka_start_pose = gymapi.Transform()
-        franka_start_pose.p = gymapi.Vec3(franka_offset, 0.0, -ubongo_cube_size-ubongo_cube_size/2 + table_stand_height)
+        franka_start_pose.p = gymapi.Vec3(franka_offset, 0.0, -ubongo_cube_size-ubongo_cube_size/2 + table_stand_height/2)
         franka_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         # Define start pose for table
