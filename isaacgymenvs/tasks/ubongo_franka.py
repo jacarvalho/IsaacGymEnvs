@@ -351,11 +351,17 @@ class FrankaUbongo(VecTask):
         table_stand_start_pose.p = gymapi.Vec3(*table_stand_pos)
         table_stand_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
+        hard_version = True
+        if hard_version:
+            offset = 0.002
+        else:
+            offset = 0.005
+
         ubongo_blue_1_start_pose = gymapi.Transform()
-        ubongo_blue_1_start_pose.p = gymapi.Vec3(0.0-0.005-ubongo_cube_size, ubongo_cube_size/2, -ubongo_cube_size)
+        ubongo_blue_1_start_pose.p = gymapi.Vec3(0.0-offset-ubongo_cube_size, ubongo_cube_size/2, -ubongo_cube_size)
         ubongo_blue_1_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
         ubongo_blue_2_start_pose = gymapi.Transform()
-        ubongo_blue_2_start_pose.p = gymapi.Vec3(0.0-0.005-ubongo_cube_size-ubongo_cube_size/2, ubongo_cube_size/2, 0.0)
+        ubongo_blue_2_start_pose.p = gymapi.Vec3(0.0-offset-ubongo_cube_size-ubongo_cube_size/2, ubongo_cube_size/2, 0.0)
         ubongo_blue_2_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         ubongo_green_1_start_pose = gymapi.Transform()

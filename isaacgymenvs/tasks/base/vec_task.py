@@ -243,11 +243,15 @@ class VecTask(Env):
             if sim_params.up_axis == gymapi.UP_AXIS_Z:
                 # cam_pos = gymapi.Vec3(20.0, 25.0, 3.0)
                 # cam_target = gymapi.Vec3(10.0, 15.0, 0.0)
-                cam_pos = gymapi.Vec3(2.0, 2.0, 3.0)
-                cam_target = gymapi.Vec3(1.0, 1.0, 0.0)
+
+                #cam_pos = gymapi.Vec3(.35, 0.0, 0.2)
+                #cam_target = gymapi.Vec3(0.0, -0., 0.07)
+
+                cam_pos = gymapi.Vec3(-.3, -0.3, 0.3)
+                cam_target = gymapi.Vec3(0.0, 0., 0.07)
             else:
                 cam_pos = gymapi.Vec3(20.0, 3.0, 25.0)
-                cam_target = gymapi.Vec3(10.0, 0.0, 15.0)
+                cam_target = gymapi.Vec3(0.0, 0.0, 0.0)
 
             self.gym.viewer_camera_look_at(
                 self.viewer, None, cam_pos, cam_target)
