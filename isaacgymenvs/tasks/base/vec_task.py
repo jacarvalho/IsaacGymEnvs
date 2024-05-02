@@ -292,13 +292,14 @@ class VecTask(Env):
                 # cam_pos = gymapi.Vec3(20.0, 25.0, 3.0)
                 # cam_target = gymapi.Vec3(10.0, 15.0, 0.0)
 
-                #cam_pos = gymapi.Vec3(.35, 0.0, 0.2)
-                #cam_target = gymapi.Vec3(0.0, -0., 0.07)
+                # cam_pos = gymapi.Vec3(.35, 0.0, 0.2)
+                # cam_target = gymapi.Vec3(0.0, -0., 0.07)
 
                 cam_pos = gymapi.Vec3(0.8, 0.0, 3.0)
                 cam_target = gymapi.Vec3(0.81, 0., 0.01)
             else:
                 cam_pos = gymapi.Vec3(20.0, 3.0, 25.0)
+		# cam_target = gymapi.Vec3(10.0, 0.0, 15.0)
                 cam_target = gymapi.Vec3(0.0, 0.0, 0.0)
 
             self.gym.viewer_camera_look_at(
@@ -378,26 +379,31 @@ class VecTask(Env):
             actions = self.dr_randomizations['actions']['noise_lambda'](actions)
 
         action_tensor = torch.clamp(actions, -self.clip_actions, self.clip_actions)
-        # step physics and render each frame
 
-        if self.controller_freq is not None:
-            steps = int(self.dt / self.controller_freq)
-            for i in range(steps):
-                if self.recompute_prephysics_step:
-                    self.pre_physics_step(action_tensor, step=i)
-                if self.force_render:
-                    self.render()
-                self.gym.simulate(self.sim)
+        if hasattr(self, 'controller_freq'):
+            if self.controller_freq is not None:
+                steps = int(self.dt / self.controller_freq)
+                for i in range(steps):
+                    if self.recompute_prephysics_step:
+                        self.pre_physics_step(action_tensor, step=i)
+                    if self.force_render:
+                        self.render()
+                    self.gym.simulate(self.sim)
+            else:
+                #self.pre_physics_step(action_tensor, step=0)
+                self.pre_physics_step(action_tensor, step=0)
+                for i in range(self.control_freq_inv):
+                    if self.force_render:
+                        self.render()
+                    self.gym.simulate(self.sim)
         else:
-            #self.pre_physics_step(action_tensor, step=0)
-            self.pre_physics_step(action_tensor, step=0)
+            # apply actions
+            self.pre_physics_step(action_tensor)
+            # step physics and render each frame
             for i in range(self.control_freq_inv):
                 if self.force_render:
                     self.render()
                 self.gym.simulate(self.sim)
-
-
-
 
         # to fix!
         if self.device == 'cpu':
