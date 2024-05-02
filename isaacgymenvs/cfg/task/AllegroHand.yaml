@@ -30,6 +30,9 @@ env:
   resetDofPosRandomInterval: 0.2
   resetDofVelRandomInterval: 0.0
 
+  startObjectPoseDY: -0.19
+  startObjectPoseDZ: 0.06
+
   # Random forces applied to the object
   forceScale: 0.0
   forceProbRange: [0.001, 0.1]
@@ -53,10 +56,13 @@ env:
   maxConsecutiveSuccesses: 0
 
   asset:
-    assetFileName: "urdf/kuka_allegro_description/allegro.urdf"
+    assetFileName: "urdf/kuka_allegro_description/allegro_touch_sensor.urdf"
     assetFileNameBlock: "urdf/objects/cube_multicolor_allegro.urdf"
     assetFileNameEgg: "mjcf/open_ai_assets/hand/egg.xml"
     assetFileNamePen: "mjcf/open_ai_assets/hand/pen.xml"
+
+  # set to True if you use camera sensors in the environment
+  enableCameraSensors: False
 
 task:
   randomize: False
@@ -152,9 +158,6 @@ task:
             # schedule: "linear"  # "linear" will scale the current random sample by `min(current num steps, schedule_steps) / schedule_steps`
             # schedule_steps: 30000
 
-  # set to True if you use camera sensors in the environment
-  enableCameraSensors: False
-
 sim:
   dt: 0.01667 # 1/60
   substeps: 2
@@ -174,4 +177,4 @@ sim:
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 1000.0
     default_buffer_size_multiplier: 5.0
-    contact_collection: 0 # 0: CC_NEVER (don't collect contact info), 1: CC_LAST_SUBSTEP (collect only contacts on last substep), 2: CC_ALL_SUBSTEPS (default - all contacts)
+    contact_collection: 0 # 0: CC_NEVER (don't collect contact info), 1: CC_LAST_SUBSTEP (collect only contacts on last substep), 2: CC_ALL_SUBSTEPS (broken - do not use!)

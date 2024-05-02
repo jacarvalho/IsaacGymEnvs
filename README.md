@@ -27,17 +27,19 @@ pip install -e .
 
 ### Creating an environment
 
-We offer an easy-to-use API for creating preset vectorized environments. For more info on what an vectorized environment is and its usage, please refer to the Gym's [documentation](https://www.gymlibrary.ml/content/vector_api/).
+We offer an easy-to-use API for creating preset vectorized environments. For more info on what a vectorized environment is and its usage, please refer to the Gym library [documentation](https://www.gymlibrary.dev/content/vectorising/#vectorized-environments).
 
 ```python
 import isaacgym
 import isaacgymenvs
 import torch
 
+num_envs = 2000
+
 envs = isaacgymenvs.make(
 	seed=0, 
 	task="Ant", 
-	num_envs=2000, 
+	num_envs=num_envs, 
 	sim_device="cuda:0",
 	rl_device="cuda:0",
 )
@@ -45,9 +47,8 @@ print("Observation space is", envs.observation_space)
 print("Action space is", envs.action_space)
 obs = envs.reset()
 for _ in range(20):
-	obs, reward, done, info = envs.step(
-		torch.rand((2000,)+envs.action_space.shape, device="cuda:0")
-	)
+	random_actions = 2.0 * torch.rand((num_envs,) + envs.action_space.shape, device = 'cuda:0') - 1.0
+	envs.step(random_actions)
 ```
 
 
@@ -114,13 +115,13 @@ differences from previous incarnations in older versions of Isaac Gym.
  
 Key arguments to the `train.py` script are:
 
-* `task=TASK` - selects which task to use. Any of `AllegroHand`, `Ant`, `Anymal`, `AnymalTerrain`, `BallBalance`, `Cartpole`, `FrankaCabinet`, `Humanoid`, `Ingenuity` `Quadcopter`, `ShadowHand`, `ShadowHandOpenAI_FF`, `ShadowHandOpenAI_LSTM`, and `Trifinger` (these correspond to the config for each environment in the folder `isaacgymenvs/config/task`)
+* `task=TASK` - selects which task to use. Any of `AllegroHand`, `AllegroHandDextremeADR`, `AllegroHandDextremeManualDR`, `AllegroKukaLSTM`, `AllegroKukaTwoArmsLSTM`, `Ant`, `Anymal`, `AnymalTerrain`, `BallBalance`, `Cartpole`, `FrankaCabinet`, `Humanoid`, `Ingenuity` `Quadcopter`, `ShadowHand`, `ShadowHandOpenAI_FF`, `ShadowHandOpenAI_LSTM`, and `Trifinger` (these correspond to the config for each environment in the folder `isaacgymenvs/config/task`)
 * `train=TRAIN` - selects which training config to use. Will automatically default to the correct config for the environment (ie. `<TASK>PPO`).
 * `num_envs=NUM_ENVS` - selects the number of environments to use (overriding the default number of environments set in the task config).
 * `seed=SEED` - sets a seed value for randomizations, and overrides the default seed set up in the task config
 * `sim_device=SIM_DEVICE_TYPE` - Device used for physics simulation. Set to `cuda:0` (default) to use GPU and to `cpu` for CPU. Follows PyTorch-like device syntax.
 * `rl_device=RL_DEVICE` - Which device / ID to use for the RL algorithm. Defaults to `cuda:0`, and also follows PyTorch-like device syntax.
-* `graphics_device_id=GRAHPICS_DEVICE_ID` - Which Vulkan graphics device ID to use for rendering. Defaults to 0. **Note** - this may be different from CUDA device ID, and does **not** follow PyTorch-like device syntax.
+* `graphics_device_id=GRAPHICS_DEVICE_ID` - Which Vulkan graphics device ID to use for rendering. Defaults to 0. **Note** - this may be different from CUDA device ID, and does **not** follow PyTorch-like device syntax.
 * `pipeline=PIPELINE` - Which API pipeline to use. Defaults to `gpu`, can also set to `cpu`. When using the `gpu` pipeline, all data stays on the GPU and everything runs as fast as possible. When using the `cpu` pipeline, simulation can run on either CPU or GPU, depending on the `sim_device` setting, but a copy of the data is always made on the CPU at every step.
 * `test=TEST`- If set to `True`, only runs inference on the policy and does not do any training.
 * `checkpoint=CHECKPOINT_PATH` - Set to path to the checkpoint to load for training or testing.
@@ -163,12 +164,17 @@ If deterministic training of RL policies is important for your work, you may wis
 
 ## Multi-GPU Training
 
-You can run multi-GPU training on NGC using `torchrun` (i.e., `torch.distributed`) using this repository.
+You can run multi-GPU training using `torchrun` (i.e., `torch.distributed`) using this repository.
 
 Here is an example command for how to run in this way -
 `torchrun --standalone --nnodes=1 --nproc_per_node=2 train.py multi_gpu=True task=Ant <OTHER_ARGS>`
 
 Where the `--nproc_per_node=` flag specifies how many processes to run and note the `multi_gpu=True` flag must be set on the train script in order for multi-GPU training to run.
+
+## Population Based Training
+
+You can run population based training to help find good hyperparameters or to train on very difficult environments which would otherwise
+be hard to learn anything on without it. See [the readme](docs/pbt.md) for details.
 
 ## WandB support
 
@@ -186,10 +192,12 @@ import isaacgym
 import isaacgymenvs
 import torch
 
+num_envs = 64
+
 envs = isaacgymenvs.make(
 	seed=0, 
 	task="Ant", 
-	num_envs=20, 
+	num_envs=num_envs, 
 	sim_device="cuda:0",
 	rl_device="cuda:0",
 	graphics_device_id=0,
@@ -208,9 +216,8 @@ envs = gym.wrappers.RecordVideo(
 envs.reset()
 print("the image of Isaac Gym viewer is an array of shape", envs.render(mode="rgb_array").shape)
 for _ in range(100):
-	envs.step(
-		torch.rand((20,)+envs.action_space.shape, device="cuda:0")
-	)
+	actions = 2.0 * torch.rand((num_envs,) + envs.action_space.shape, device = 'cuda:0') - 1.0
+	envs.step(actions)
 ```
 
 ## Capture videos during training
@@ -250,6 +257,30 @@ Please cite this work as:
 }
 ```
 
+**Note** if you use the DexPBT: Scaling up Dexterous Manipulation for Hand-Arm Systems with Population Based Training work or the code related to Population Based Training, please cite the following paper:
+
+```
+@inproceedings{
+	petrenko2023dexpbt,
+	author = {Aleksei Petrenko, Arthur Allshire, Gavriel State, Ankur Handa, Viktor Makoviychuk},
+	title = {DexPBT: Scaling up Dexterous Manipulation for Hand-Arm Systems with Population Based Training},
+	booktitle = {RSS},
+	year = {2023}
+}
+```
+
+**Note** if you use the DeXtreme: Transfer of Agile In-hand Manipulation from Simulation to Reality work or the code related to Automatic Domain Randomisation, please cite the following paper:
+
+```
+@inproceedings{
+	handa2023dextreme,
+	author = {Ankur Handa, Arthur Allshire, Viktor Makoviychuk, Aleksei Petrenko, Ritvik Singh, Jingzhou Liu, Denys Makoviichuk, Karl Van Wyk, Alexander Zhurkevich, Balakumar Sundaralingam, Yashraj Narang, Jean-Francois Lafleche, Dieter Fox, Gavriel State},
+	title = {DeXtreme: Transfer of Agile In-hand Manipulation from Simulation to Reality},
+	booktitle = {ICRA},
+	year = {2023}
+} 
+```
+
 **Note** if you use the ANYmal rough terrain environment in your work, please ensure you cite the following work:
 ```
 @misc{rudin2021learning,
@@ -260,7 +291,7 @@ Please cite this work as:
 }
 ```
 
-If you use the Trifinger environment in your work, please ensure you cite the following work:
+**Note** if you use the Trifinger environment in your work, please ensure you cite the following work:
 ```
 @misc{isaacgym-trifinger,
   title     = {{Transferring Dexterous Manipulation from GPU Simulation to a Remote Real-World TriFinger}},
@@ -270,7 +301,7 @@ If you use the Trifinger environment in your work, please ensure you cite the fo
 }
 ```
 
-If you use the AMP: Adversarial Motion Priors environment in your work, please ensure you cite the following work:
+**Note** if you use the AMP: Adversarial Motion Priors environment in your work, please ensure you cite the following work:
 ```
 @article{
 	2021-TOG-AMP,
@@ -292,7 +323,7 @@ If you use the AMP: Adversarial Motion Priors environment in your work, please e
 } 
 ```
 
-If you use the Factory simulation methods (e.g., SDF collisions, contact reduction) or Factory learning tools (e.g., assets, environments, or controllers) in your work, please cite the following paper:
+**Note** if you use the Factory simulation methods (e.g., SDF collisions, contact reduction) or Factory learning tools (e.g., assets, environments, or controllers) in your work, please cite the following paper:
 ```
 @inproceedings{
 	narang2022factory,
@@ -301,4 +332,15 @@ If you use the Factory simulation methods (e.g., SDF collisions, contact reducti
 	booktitle = {Robotics: Science and Systems},
 	year = {2022}
 } 
+```
+
+**Note** if you use the IndustReal training environments or algorithms in your work, please cite the following paper:
+```
+@inproceedings{
+	tang2023industreal,
+	author = {Bingjie Tang and Michael A Lin and Iretiayo Akinola and Ankur Handa and Gaurav S Sukhatme and Fabio Ramos and Dieter Fox and Yashraj Narang},
+	title = {IndustReal: Transferring contact-rich assembly tasks from simulation to reality},
+	booktitle = {Robotics: Science and Systems},
+	year = {2023}
+}
 ```

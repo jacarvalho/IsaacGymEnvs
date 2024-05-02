@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022, NVIDIA Corporation
+# Copyright (c) 2021-2023, NVIDIA Corporation
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,9 @@ import os
 import sys
 import torch
 
-from isaacgym import gymapi, gymtorch, torch_utils
+from gym import logger
+from isaacgym import gymapi, gymtorch
+from isaacgymenvs.utils import torch_jit_utils as torch_utils
 from isaacgymenvs.tasks.base.vec_task import VecTask
 import isaacgymenvs.tasks.factory.factory_control as fc
 from isaacgymenvs.tasks.factory.factory_schema_class_base import FactoryABCBase
@@ -69,12 +71,11 @@ class FactoryBase(VecTask, FactoryABCBase):
         cs = hydra.core.config_store.ConfigStore.instance()
         cs.store(name='factory_schema_config_base', node=FactorySchemaConfigBase)
 
-        config_path = os.path.join('task/FactoryBase.yaml')  # relative to Gym's Hydra search path (cfg dir)
+        config_path = 'task/FactoryBase.yaml'  # relative to Gym's Hydra search path (cfg dir)
         self.cfg_base = hydra.compose(config_name=config_path)
         self.cfg_base = self.cfg_base['task']  # strip superfluous nesting
 
-        asset_info_path = os.path.join('..', '..', 'assets', 'factory', 'yaml',
-                                       'factory_asset_info_franka_table.yaml')  # relative to Gym's Hydra search path (cfg dir)
+        asset_info_path = '../../assets/factory/yaml/factory_asset_info_franka_table.yaml'  # relative to Gym's Hydra search path (cfg dir)
         self.asset_info_franka_table = hydra.compose(config_name=asset_info_path)
         self.asset_info_franka_table = self.asset_info_franka_table['']['']['']['']['']['']['assets']['factory']['yaml']  # strip superfluous nesting
 
@@ -82,30 +83,8 @@ class FactoryBase(VecTask, FactoryABCBase):
     def create_sim(self):
         """Set sim and PhysX params. Create sim object, ground plane, and envs."""
 
-        self.sim_params.dt = self.cfg_base.sim.dt
-        self.sim_params.substeps = self.cfg_base.sim.num_substeps
-        self.sim_params.up_axis = gymapi.UP_AXIS_Z
-        self.sim_params.gravity.x = 0
-        self.sim_params.gravity.y = 0
-        self.sim_params.gravity.z = -self.cfg_base.sim.gravity_mag
         if self.cfg_base.mode.export_scene:
             self.sim_params.use_gpu_pipeline = False
-        else:
-            self.sim_params.use_gpu_pipeline = True
-
-        self.sim_params.physx.use_gpu = True
-        self.sim_params.physx.solver_type = 1  # default = 1 (Temporal Gauss-Seidel)
-        self.sim_params.physx.num_position_iterations = self.cfg_base.sim.num_pos_iters
-        self.sim_params.physx.num_velocity_iterations = self.cfg_base.sim.num_vel_iters
-        self.sim_params.physx.rest_offset = 0.0  # default = 0.001
-        self.sim_params.physx.contact_offset = 0.005  # default = 0.02
-        self.sim_params.physx.bounce_threshold_velocity = 0.2  # default = 0.01
-        self.sim_params.physx.max_depenetration_velocity = 5.0  # default = 100.0
-        self.sim_params.physx.friction_offset_threshold = 0.01  # default = 0.04
-        self.sim_params.physx.friction_correlation_distance = 0.00625  # default = 0.025
-
-        self.sim_params.physx.max_gpu_contact_pairs = 1024 ** 2  # default = 1024^2
-        self.sim_params.physx.default_buffer_size_multiplier = 8  # default = 1
 
         self.sim = super().create_sim(compute_device=self.device_id,
                                       graphics_device=self.graphics_device_id,
@@ -500,6 +479,11 @@ class FactoryBase(VecTask, FactoryABCBase):
                                                         gymtorch.unwrap_tensor(self.dof_torque),
                                                         gymtorch.unwrap_tensor(self.franka_actor_ids_sim),
                                                         len(self.franka_actor_ids_sim))
+
+    def print_sdf_warning(self):
+        """Generate SDF warning message."""
+
+        logger.warn('Please be patient: SDFs may be generating, which may take a few minutes. Terminating prematurely may result in a corrupted SDF cache.')
 
     def enable_gravity(self, gravity_mag):
         """Enable gravity."""
