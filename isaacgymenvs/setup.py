@@ -30,7 +30,7 @@ setup(
     description="Benchmark environments for high-speed robot learning in NVIDIA IsaacGym.",
     keywords=["robotics", "rl"],
     include_package_data=True,
-    python_requires=">=3.6.*",
+    python_requires=">=3.6",
     install_requires=INSTALL_REQUIRES,
     packages=find_packages(),
     #packages=[package for package in find_packages()],
