@@ -1,0 +1,85 @@
+params:
+  seed: ${...seed}
+
+  algo:
+    name: a2c_continuous_fixCenter
+
+  model:
+    name: continuous_a2c_logstd
+
+  network:
+    name: actor_critic
+    separate: True
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: 0.5
+        fixed_sigma: True
+    mlp:
+      units: [128, 128]
+      activation: relu
+      
+      initializer:
+        name: default
+      regularizer:
+        name: None
+
+  load_checkpoint: ${if:${...checkpoint},True,False} # flag which sets whether to load the checkpoint
+  load_path: ${...checkpoint} # path to the checkpoint to load
+
+  config:
+    name: ${resolve_default:Box2DInsertion,${....experiment}}
+    full_experiment_name: ${.name}
+    env_name: rlgpu
+    ppo: True
+    num_actors: ${....task.env.numEnvs}
+    max_epochs: ${resolve_default:300,${....max_iterations}}
+
+    learning_rate: 1e-3
+    learning_rate_critic: 3e-4 # if set learning_rate is ignored
+    learning_rate_actor: 1e-4 # if set learning_rate is ignored
+    weight_decay: 1e-6
+
+    reward_shaper:
+      scale_value: 0.01
+    gamma: 0.99
+    tau: 0.95
+    lr_schedule: None
+    kl_threshold: 0.008
+    score_to_win: 100
+    bounds_loss_coef: 0.
+    entropy_coef: 0.001
+    critic_coef: 1.
+
+    mixed_precision: False
+    normalize_input: False #destroys everything?
+    normalize_value: True
+    normalize_advantage: True
+
+    truncate_grads: True
+    grad_norm: 0.1
+    clip_value: False
+    clip_actions: False
+    e_clip: 0.2
+
+    save_best_after: 1
+    save_frequency: 1
+    visualize: False
+
+    horizon_length: 5000
+    minibatch_size: 1 # batch_size must be a multiple of minibatch_size, batch_size = horizon_lenght * num_actors * num_agents
+    minibatch_size_critic: 2500  # if set minibatch_size is ignored
+    minibatch_size_actor: 500  # if set minibatch_size is ignored
+    #TODO assert that divisor
+    mini_epochs: 1
+    mini_epochs_critic: 4 # overwrites mini_epochs
+    mini_epochs_actor: 8 # overwrites mini_epochs
+
+
+    seq_len: 1  # just used for RNN TODO delete?

@@ -25,7 +25,7 @@ env:
   maxEffort: 100.0
 
   minimum_linear_velocity_norm: 0.
-  maximum_linear_velocity_norm: 1.0
+  maximum_linear_velocity_norm: 0.3
   minimum_angular_velocity_norm: 0.
   maximum_angular_velocity_norm: 1.0
   clipObservations: 1.0
@@ -35,7 +35,7 @@ env:
   enableOrientations: False  # If true, includes the orientations as part of the state and controller
 
   enableIC: True  # If false, actions are torques
-  controlVelocity: False  # If false, IC controls the position. If true, control directly the velocity u = K*(dx_des - dx) - D*dx_des
+  controlVelocity: False   # If false, IC controls the position. If true, control directly the velocity u = K*(dx_des - dx) - D*dx_des
   learnOrientations: False  # If false, the desired orientation is fixed. If true, is learned by the policy
   enableDampingTerm: True  # If false, remove the damping term D of the controller (only makes sense with controlVelocity)
   learnStiffness: False

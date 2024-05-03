@@ -1,0 +1,118 @@
+params:
+  seed: ${...seed}
+
+  algo:
+    name: a2c_continuous_fixCenter
+
+  model:
+    name: continuous_a2c_logstd
+
+  network:
+    name: actor_critic_mSVF
+    space_dimension: 3  # Determines if 2D or 3D space
+    use_orientation: True # Determines if the orientation is also learned+
+    output_orientation: True
+    learn_stiffness: False
+
+    enable_repulsive_fields: False
+    enable_scaling_term: False
+
+    # if a pretrained mSVF is loaded, its structure (units) and activations will be applied and the ones from the config are ignored
+    load_pretrained_mSVF: False
+    path_to_pretrained_mSVF: /home/jascha/Documents/Study/LieflowsRL/lieflows-rl/scripts/imitation_learning/insertion_tasks/box3d_insertion/saved_models/box3d_l500epochs_mSVF.pth
+    #path_to_pretrained_mSVF: "/home/jascha/LieflowsRl/scripts/imitation_learning/insertion_tasks/box3d_insertion/saved_models/box3d_500epochs_mSVF.pth"  # Path on Franklin
+
+
+    space: # todo check stuff here like mu activation etc
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: -0.5
+        fixed_sigma: True
+
+    # Parameters for the Neural ODE
+    actor_mSVF:
+      units: [32,32 ]
+      steps: 10
+      solver: euler
+      activation: relu
+      boundaries: [[-1.7, -1.7, -1.7], [1.7, 1.7, 1.7]]
+
+      # if 2D only first two will be used
+      goal_position: [0., 0., 0.]
+      goal_angle: [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]] # only applied if orientation is enabled, has to be given in [cos(theta), sin(theta)] - AVOID [0,0]
+
+    residual:
+      enable_residual_policy: True
+      units: [64,64]
+      activation: relu
+      use_force: False
+      enable_increasing_influence: False
+      learn_only_stiffness: False
+
+    # Parameters for the Network that determines the norm of the velocities outputted by the mSVF
+    scaled_linear_dynamics:
+      units: [32,32]
+      activation: relu
+
+    # Parameters for the Critic Network
+    critic_mlp:
+      units: [64,64]
+      activation: relu
+
+  load_checkpoint: ${if:${...checkpoint},True,False} # flag which sets whether to load the checkpoint
+  load_path: ${...checkpoint} # path to the checkpoint to load
+
+  config:
+    name: ${resolve_default:Box3DInsertion,${....experiment}}
+    full_experiment_name: ${.name}
+    env_name: rlgpu
+    ppo: True
+    num_actors: ${....task.env.numEnvs}
+    max_epochs: ${resolve_default:600,${....max_iterations}}
+    learning_rate: 1e-3
+    learning_rate_critic: 1e-3 # if set learning_rate is ignored
+    learning_rate_actor: 3e-4 # if set learning_rate is ignored
+    weight_decay: 1e-6
+
+    reward_shaper:
+      scale_value: 0.1
+    gamma: 0.999
+    tau: 0.95
+    lr_schedule: None
+    kl_threshold: 0.008
+    score_to_win: 100
+    bounds_loss_coef: 0.
+    entropy_coef: 0.01
+    critic_coef: 1.
+
+    mixed_precision: False
+    normalize_input: False #destroys everything?
+    normalize_value: True
+    normalize_advantage: True
+
+    truncate_grads: False
+    grad_norm: 0.1
+    clip_value: False
+    clip_actions: False
+    e_clip: 0.2
+
+    save_best_after: 1
+    save_frequency: 10
+    visualize: False
+
+    horizon_length: 100
+    minibatch_size: 1 # batch_size must be a multiple of minibatch_size, batch_size = horizon_lenght * num_actors * num_agents
+    minibatch_size_critic: 1000  # if set minibatch_size is ignored
+    minibatch_size_actor: 1000  # if set minibatch_size is ignored
+    mini_epochs: 1
+    mini_epochs_critic: 4 # overwrites mini_epochs
+    mini_epochs_actor: 4 # overwrites mini_epochs
+
+
+    seq_len: 1  # just used for RNN TODO delete?

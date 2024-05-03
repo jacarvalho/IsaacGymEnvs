@@ -1,0 +1,175 @@
+<?xml version="1.0"?>
+<robot name="box2d_insertion">
+
+  <link name="base">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="box">
+        <color rgba="1. 0. 0. 1"/>
+      </material>
+    </visual>
+  </link>
+
+
+  <link name="part1">
+    <visual>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <material name="part1">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <contact_coefficients mu="0.105" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <mass value="1"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_part1" type="fixed">
+    <origin xyz="0 -0.565 0"/>
+    <parent link="base"/>
+    <child link="part1"/>
+  </joint>
+
+  <link name="part2">
+    <visual>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <material name="part1">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <contact_coefficients mu="0.005" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <mass value="1"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_part2" type="fixed">
+    <origin xyz="0 0.565 0"/>
+    <parent link="base"/>
+    <child link="part2"/>
+  </joint>
+
+
+
+<link name="part4">
+    <visual>
+      <geometry>
+        <box size="0.1 2. 0.2"/>
+      </geometry>
+      <material name="part1">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.1 2. 0.2"/>
+      </geometry>
+      <contact_coefficients mu="0.005" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <mass value="1"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_part4" type="fixed">
+    <origin xyz="-0.185 0. 0"/>
+    <parent link="base"/>
+    <child link="part4"/>
+  </joint>
+
+  <link name="dummy">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+  <link name="dummy2">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="dummy2">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+
+  <joint name="p_joint_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <origin xyz="0 0 0"/>
+    <parent link="base"/>
+    <child link="dummy"/>
+    <limit effort="1.0" lower="-1.0" upper="1.0" velocity="5.0"/>
+  </joint>
+
+  <joint name="p_joint_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <origin xyz="0 0 0"/>
+    <parent link="dummy"/>
+    <child link="dummy2"/>
+    <limit effort="1.0" lower="-1.0" upper="1.0" velocity="5.0"/>
+  </joint>
+
+  <link name="peg">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.2"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.2"/>
+      </geometry>
+      <contact_coefficients mu=".00005" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.00541667" ixy="0" ixz="0" iyy="0.02104167" iyz="0" izz="0.02604167"/>
+    </inertial>
+  </link>
+
+  <joint name="r_joint_z" type="revolute">
+    <axis xyz="0 0 1"/>
+    <origin xyz="0 0 0.0"/>
+    <parent link="dummy2"/>
+    <child link="peg"/>
+    <limit effort="1.0" lower="-31.4159265359" upper="31.4159265359" velocity="5.0"/>
+  </joint>
+</robot>
+

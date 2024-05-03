@@ -109,6 +109,7 @@ class Env(ABC):
 
         self.num_actions = config["env"]["numActions"]
         self.control_freq_inv = config["env"].get("controlFrequencyInv", 1)
+        self.recompute_prephysics_step = config["env"].get("recomputePrePhysicsStep", False)
 
         self.act_space = spaces.Box(np.ones(self.num_actions) * -1., np.ones(self.num_actions) * 1.)
 
@@ -217,7 +218,7 @@ class VecTask(Env):
             graphics_device_id: the device ID to render with.
             headless: Set to False to disable viewer rendering.
             virtual_screen_capture: Set to True to allow the users get captured screen in RGB array via `env.render(mode='rgb_array')`. 
-            force_render: Set to True to always force rendering in the steps (if the `control_freq_inv` is greater than 1 we suggest stting this arg to True)
+            force_render: Set to True to always force rendering in the steps (if the `control_freq_inv` is greater than 1 we suggest setting this arg to True)
         """
         # super().__init__(config, rl_device, sim_device, graphics_device_id, headless, use_dict_obs)
         super().__init__(config, rl_device, sim_device, graphics_device_id, headless)
@@ -299,7 +300,8 @@ class VecTask(Env):
                 cam_target = gymapi.Vec3(0.81, 0., 0.01)
             else:
                 cam_pos = gymapi.Vec3(20.0, 3.0, 25.0)
-		# cam_target = gymapi.Vec3(10.0, 0.0, 15.0)
+
+                # cam_target = gymapi.Vec3(10.0, 0.0, 15.0)
                 cam_target = gymapi.Vec3(0.0, 0.0, 0.0)
 
             self.gym.viewer_camera_look_at(
@@ -380,22 +382,16 @@ class VecTask(Env):
 
         action_tensor = torch.clamp(actions, -self.clip_actions, self.clip_actions)
 
-        if hasattr(self, 'controller_freq'):
-            if self.controller_freq is not None:
-                steps = int(self.dt / self.controller_freq)
-                for i in range(steps):
-                    if self.recompute_prephysics_step:
-                        self.pre_physics_step(action_tensor, step=i)
-                    if self.force_render:
-                        self.render()
-                    self.gym.simulate(self.sim)
-            else:
-                #self.pre_physics_step(action_tensor, step=0)
-                self.pre_physics_step(action_tensor, step=0)
-                for i in range(self.control_freq_inv):
-                    if self.force_render:
-                        self.render()
-                    self.gym.simulate(self.sim)
+        if self.recompute_prephysics_step:
+            # compute updated commands after each simulation step
+            # this is useful, e.g., for impedance control, where the policy sets the desired position and
+            # the actual position is updated after each simulation step, so the torque command needs to be updated
+            for i in range(self.control_freq_inv):
+                self.pre_physics_step(action_tensor, step=i)
+                self.gym.simulate(self.sim)
+            # render only after the last step
+            if self.force_render:
+                self.render()
         else:
             # apply actions
             self.pre_physics_step(action_tensor)
@@ -448,7 +444,7 @@ class VecTask(Env):
         pass
 
     def reset(self):
-        """Is called only once when environment starts to provide the first observations.
+        """Is called only once when the environment starts to provide the first observations.
         Doesn't calculate observations. Actual reset and observation calculation need to be implemented by user.
         Returns:
             Observation dictionary

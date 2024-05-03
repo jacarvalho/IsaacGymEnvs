@@ -34,12 +34,13 @@ from typing import *
 
 from isaacgym import gymutil, gymtorch, gymapi
 from isaacgym.torch_utils import *
-from tasks.base.vec_task import VecTask
 
 import pytorch_kinematics as pk
 import theseus as th
 
 import torch
+
+from isaacgymenvs.tasks.base.vec_task import VecTask
 
 
 @torch.jit.script

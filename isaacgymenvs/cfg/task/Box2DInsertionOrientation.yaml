@@ -10,35 +10,48 @@ env:
 
   #controller_freq: 0.002 # 1s / 500 is the controller frequency
   recomputePrePhysicsStep: True
+  controlFrequencyInv: 1
 
   asset:
-    #assetRoot: "/home/carvalho/Projects/LieFlowsRL/lieflows-rl/robots/insertion_task/assets"
-    assetRoot: "/home/jascha/Documents/Study/LieflowsRL/lieflows-rl/robots/insertion_task/assets"
-    #assetRoot: "/home/jascha/LieflowsRl/robots/insertion_task/assets"  # Path on Franklin
-    assetFileName: "urdf/box2d_LARGE_insertion.urdf"
+    use_env_v2: True
+    assetRoot: "/robots/insertion_task/assets"
+    assetFileName: ${if:${task.env.asset.use_env_v2},urdf/Box2D/box2D_v2.urdf,urdf/Box2D/box2D.urdf}
+    #assetFileName: "urdf/Box2D/box2D.urdf"
 
   maxEpisodeLength: 300
 
   initialPositionBounds: [[0.8, -0.99], [0.99, 0.99]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
-  enableSparseReward: True  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
+  enableSparseReward: False  # If set, the reward will always be -1, if not the reward is the euclidean distance to the goal
   useInitStates: False  # If set, the initial states will be sampled from a given list
 
   minimum_linear_velocity_norm: 0.
-  maximum_linear_velocity_norm: 1.
+  maximum_linear_velocity_norm: .2
   minimum_angular_velocity_norm: 0.
-  maximum_angular_velocity_norm: 1.
+  maximum_angular_velocity_norm: .1
 #  clipObservations: 1.0
 #  clipActions: 10.0
 
+  learnStiffness: False
+  K_pos_min: 5.
+  K_pos_max: 200.
+  K_orn_min: 5.
+  K_orn_max: 50.
+
+  observeForce: False
+
+  justLearnStiffness: False # important for MLP not relevant for MSVF
+
+  learnOrientations: True  # If false, the desired orientation is fixed. If true, is learned by the policy
+  observeOrientations: True
+
+  enable_PD_to_goal: False  # If true, the signal of PD controller towards the desired goal is added to the given actions
+
   enableVelocityState: False  # If true, uses linear and angular velocities in the state, along with the position
-  enableOrientations: False  # If true, includes the orientations as part of the state and controller
+  enableOrientations: True  # If true, includes the orientations as part of the state and controller
 
   enableIC: True  # If false, actions are torques
-  controlVelocity: False  # If false, IC controls the position. If true, control directly the velocity u = K*(dx_des - dx) - D*dx_des
-  learnOrientations: False  # If false, the desired orientation is fixed. If true, is learned by the policy
+  controlVelocity: True  # If false, IC controls the position. If true, control directly the velocity u = K*(dx_des - dx) - D*dx_des
   enableDampingTerm: True  # If false, remove the damping term D of the controller (only makes sense with controlVelocity)
-  learnStiffness: False
-  learnDamping: False
 
   enableDebugVis: True
 
@@ -52,7 +65,7 @@ sim:
   substeps: 2
   up_axis: "z"
   use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
-  gravity: [0.0, 0.0, 0.0]
+  gravity: [0.0, 0.0, 0.00]
   physx:
     num_threads: ${....num_threads}
     solver_type: ${....solver_type}
@@ -67,7 +80,6 @@ sim:
     max_gpu_contact_pairs: 1048576 # 1024*1024
     num_subscenes: ${....num_subscenes}
     contact_collection: 0 # 0: CC_NEVER (don't collect contact info), 1: CC_LAST_SUBSTEP (collect only contacts on last substep), 2: CC_ALL_SUBSTEPS (default - all contacts)
-
 
 task:
   randomize: False

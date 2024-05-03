@@ -1,0 +1,135 @@
+<?xml version="1.0"?>
+<robot name="box3d_insertion">
+
+   <link name="box">
+    <visual>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.05"/>
+	  <inertia ixx="0.00001203" ixy="0" ixz="0" iyy="0.00001203" iyz="0" izz="0.00001203"/>
+  </inertial>
+  </link>
+
+<link name="box2">
+    <visual>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.05"/>
+	  <inertia ixx="0.00001203" ixy="0" ixz="0" iyy="0.00001203" iyz="0" izz="0.00001203"/>
+  </inertial>
+  </link>
+  <joint name="box_to_box2" type="fixed">
+    <origin xyz="-0.038 0. 0"/>
+    <parent link="box"/>
+    <child link="box2"/>
+  </joint>
+
+  <link name="box3">
+    <visual>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.05"/>
+	  <inertia ixx="0.00001203" ixy="0" ixz="0" iyy="0.00001203" iyz="0" izz="0.00001203"/>
+  </inertial>
+  </link>
+  <joint name="box_to_box3" type="fixed">
+    <origin xyz="0.038 0. 0"/>
+    <parent link="box"/>
+    <child link="box3"/>
+  </joint>
+
+    <link name="box4">
+    <visual>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.05"/>
+	  <inertia ixx="0.00001203" ixy="0" ixz="0" iyy="0.00001203" iyz="0" izz="0.00001203"/>
+  </inertial>
+  </link>
+  <joint name="box3_to_box4" type="fixed">
+    <origin xyz="0 0.038 0"/>
+    <parent link="box3"/>
+    <child link="box4"/>
+
+  </joint>
+      <link name="box5">
+    <visual>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.038 0.038 0.038"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.05"/>
+	  <inertia ixx="0.00001203" ixy="0" ixz="0" iyy="0.00001203" iyz="0" izz="0.00001203"/>
+  </inertial>
+  </link>
+  <joint name="box2_to_box5" type="fixed">
+    <origin xyz="0 0 -0.038"/>
+    <parent link="box2"/>
+    <child link="box5"/>
+  </joint>
+
+
+</robot>

@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<robot name="box2d_insertion">
+
+  <link name="base">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="box">
+        <color rgba="1. 0. 0. 1"/>
+      </material>
+    </visual>
+  </link>
+
+
+  <link name="part1">
+    <visual>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <material name="part1">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <contact_coefficients mu="0.105" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <mass value="1"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_part1" type="fixed">
+    <origin xyz="0 -0.565 0"/>
+    <parent link="base"/>
+    <child link="part1"/>
+  </joint>
+
+  <link name="part2">
+    <visual>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <material name="part1">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.27 0.87 0.2"/>
+      </geometry>
+      <contact_coefficients mu="0.005" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <mass value="1"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_part2" type="fixed">
+    <origin xyz="0 0.565 0"/>
+    <parent link="base"/>
+    <child link="part2"/>
+  </joint>
+
+
+
+<link name="part4">
+    <visual>
+      <geometry>
+        <box size="0.1 2. 0.2"/>
+      </geometry>
+      <material name="part1">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.1 2. 0.2"/>
+      </geometry>
+      <contact_coefficients mu="0.005" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <mass value="1"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_part4" type="fixed">
+    <origin xyz="-0.185 0. 0"/>
+    <parent link="base"/>
+    <child link="part4"/>
+  </joint>
+
+</robot>
+

@@ -1,0 +1,538 @@
+<?xml version="1.0"?>
+<robot name="box3d_insertion">
+
+  <link name="base">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="box">
+        <color rgba="1. 0. 0. 1"/>
+      </material>
+    </visual>
+  </link>
+
+<link name="table">
+    <visual>
+      <geometry>
+        <box size="2.0 2.0 0.05"/>
+      </geometry>
+      <material name="table">
+        <color rgba="0.9 0.9 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="2.0 2.0 0.05"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+  </link>
+
+  <joint name="base_to_table" type="fixed">
+    <origin xyz="0 0 -0.125"/>
+    <parent link="base"/>
+    <child link="table"/>
+  </joint>
+
+<link name="l">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="L">
+        <color rgba="0. 0.9 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_l" type="fixed">
+    <origin xyz="-0. 0 0."/>
+    <parent link="base"/>
+    <child link="l"/>
+  </joint>
+
+<link name="l2">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="L">
+        <color rgba="0. 0.9 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="l_to_l2" type="fixed">
+    <origin xyz="0.25 0. 0"/>
+    <parent link="l"/>
+    <child link="l2"/>
+  </joint>
+  <link name="l3">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="L">
+        <color rgba="0. 0.9 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="l2_to_l3" type="fixed">
+    <origin xyz="0.25 0. 0"/>
+    <parent link="l2"/>
+    <child link="l3"/>
+  </joint>
+
+      <link name="l4">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="L">
+        <color rgba="0. 0.9 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="l3_to_l4" type="fixed">
+    <origin xyz="0 0 0.25"/>
+    <parent link="l3"/>
+    <child link="l4"/>
+  </joint>
+
+  <link name="b">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="B">
+        <color rgba="0. 0. 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+
+  <joint name="base_to_b" type="fixed">
+    <origin xyz="-0.255 0.25 0."/>
+    <parent link="base"/>
+    <child link="b"/>
+  </joint>
+
+<link name="b2">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="B">
+        <color rgba="0. 0. 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="b_to_b2" type="fixed">
+    <origin xyz="0.25 0. 0"/>
+    <parent link="b"/>
+    <child link="b2"/>
+  </joint>
+  <link name="b3">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="B">
+        <color rgba="0. 0. 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="b2_to_b3" type="fixed">
+    <origin xyz="0.25 0. 0"/>
+    <parent link="b2"/>
+    <child link="b3"/>
+  </joint>
+
+      <link name="b4">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="B">
+        <color rgba="0. 0. 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="b_to_b4" type="fixed">
+    <origin xyz="0 0 0.25"/>
+    <parent link="b"/>
+    <child link="b4"/>
+  </joint>
+      <link name="b5">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="B">
+        <color rgba="0. 0. 0.9 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1."/>
+      <inertia ixx="0.01041667" ixy="0" ixz="0" iyy="0.01041667" iyz="0" izz="0.01041667"/>
+    </inertial>
+  </link>
+  <joint name="b2_to_b5" type="fixed">
+    <origin xyz="0 0 0.25"/>
+    <parent link="b2"/>
+    <child link="b5"/>
+  </joint>
+
+<link name="dummy">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+  <link name="dummy2">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="dummy2">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+  <link name="dummy3">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="dummy2">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+  <link name="dummy4">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="dummy2">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+  <link name="dummy5">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+      <material name="dummy2">
+        <color rgba="0. 1. 0. 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.00000167" ixy="0" ixz="0" iyy="0.00000167" iyz="0" izz="0.00000167"/>
+    </inertial>
+  </link>
+
+
+   <link name="box">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.2"/>
+        <inertia ixx="0.00208333" ixy="0" ixz="0" iyy="0.00208333" iyz="0" izz="0.00208333"/>
+    </inertial>
+  </link>
+
+<link name="box2">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.2"/>
+        <inertia ixx="0.00208333" ixy="0" ixz="0" iyy="0.00208333" iyz="0" izz="0.00208333"/>
+    </inertial>
+  </link>
+  <joint name="box_to_box2" type="fixed">
+    <origin xyz="-0.25 0. 0"/>
+    <parent link="box"/>
+    <child link="box2"/>
+  </joint>
+  <link name="box3">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.2"/>
+        <inertia ixx="0.00208333" ixy="0" ixz="0" iyy="0.00208333" iyz="0" izz="0.00208333"/>
+    </inertial>
+  </link>
+  <joint name="box_to_box3" type="fixed">
+    <origin xyz="0.25 0. 0"/>
+    <parent link="box"/>
+    <child link="box3"/>
+  </joint>
+    <link name="box4">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.2"/>
+        <inertia ixx="0.00208333" ixy="0" ixz="0" iyy="0.00208333" iyz="0" izz="0.00208333"/>
+    </inertial>
+  </link>
+  <joint name="box3_to_box4" type="fixed">
+    <origin xyz="0 0.25 0"/>
+    <parent link="box3"/>
+    <child link="box4"/>
+
+  </joint>
+      <link name="box5">
+    <visual>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <material name="box">
+        <color rgba="0.9 0. 0. 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+      <contact_coefficients mu="0.5" kp="0." kd="0."/>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="0.2"/>
+        <inertia ixx="0.00208333" ixy="0" ixz="0" iyy="0.00208333" iyz="0" izz="0.00208333"/>
+    </inertial>
+  </link>
+  <joint name="box2_to_box5" type="fixed">
+    <origin xyz="0 0 -0.25"/>
+    <parent link="box2"/>
+    <child link="box5"/>
+  </joint>
+
+  <joint name="p_joint_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <origin xyz="0 0 0"/>
+    <parent link="base"/>
+    <child link="dummy"/>
+    <limit effort="1.0" lower="-1.0" upper="1.0" velocity="3.0"/>
+  </joint>
+
+  <joint name="p_joint_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <origin xyz="0 0 0"/>
+    <parent link="dummy"/>
+    <child link="dummy2"/>
+    <limit effort="1.0" lower="-1.0" upper="1.0" velocity="3.0"/>
+  </joint>
+
+  <joint name="p_joint_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <origin xyz="0 0 0"/>
+    <parent link="dummy2"/>
+    <child link="dummy3"/>
+    <limit effort="1.0" lower="-1.0" upper="1.0" velocity="3.0"/>
+  </joint>
+
+  <joint name="r_joint_x" type="revolute">
+    <axis xyz="1 0 0"/>
+    <origin xyz="0 0 0"/>
+    <parent link="dummy3"/>
+    <child link="dummy4"/>
+    <limit effort="1.0" lower="-31.14159265359" upper="31.14159265359" velocity="0.3"/>
+  </joint>
+
+  <joint name="r_joint_y" type="revolute">
+    <axis xyz="0 1 0"/>
+    <origin xyz="0 0 0"/>
+    <parent link="dummy4"/>
+    <child link="dummy5"/>
+    <limit effort="1.0" lower="-31.14159265359" upper="31.14159265359" velocity="0.3"/>
+  </joint>
+
+  <joint name="r_joint_z" type="revolute">
+    <axis xyz="0 0 1"/>
+    <origin xyz="0 0 0"/>
+    <parent link="dummy5"/>
+    <child link="box"/>
+    <limit effort="1.0" lower="-31.14159265359" upper="31.14159265359" velocity="0.3"/>
+  </joint>
+
+
+</robot>

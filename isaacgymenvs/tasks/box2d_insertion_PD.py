@@ -35,10 +35,12 @@ from typing import *
 
 from isaacgym import gymutil, gymtorch, gymapi
 from isaacgym.torch_utils import *
-from tasks.base.vec_task import VecTask
 from gym import spaces
 import pytorch_kinematics as pk
 import theseus as th
+
+from isaacgymenvs.tasks.base.vec_task import VecTask
+
 
 @torch.jit.script
 def orientation_error(desired, current):

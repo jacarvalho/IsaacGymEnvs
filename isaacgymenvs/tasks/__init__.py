@@ -48,7 +48,7 @@ from .allegro_hand import AllegroHand
 from .dextreme.allegro_hand_dextreme import AllegroHandDextremeManualDR, AllegroHandDextremeADR
 from .trifinger import Trifinger
 
-from .box2d_insertion import Box2DInsertion
+from .insertion_box2d import InsertionBox2D
 from .box3d_insertion_franka import FrankaBox3DInsertion
 from .box3d_insertion import Box3DInsertion
 from .ubongo_franka import FrankaUbongo
@@ -119,7 +119,8 @@ isaacgym_task_map = {
     "Quadcopter": Quadcopter,
     "ShadowHand": ShadowHand,
     "Trifinger": Trifinger,
-    "Box2DInsertion": Box2DInsertion,
+
+    "InsertionBox2D": InsertionBox2D,
     "FrankaBox3DInsertion": FrankaBox3DInsertion,
     "Box3DInsertion": Box3DInsertion,
     "UbongoInsertion": UbongoInsertion,

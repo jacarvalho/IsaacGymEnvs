@@ -1,5 +1,5 @@
 # used to create the object
-name: FrankaBox3DInsertion
+name: FrankaUbongo
 
 physics_engine: ${..physics_engine}
 
@@ -38,7 +38,7 @@ env:
 
   asset:
     assetRoot: "/robots/insertion_task/assets"
-    assetFileNameFranka: "urdf/franka_description/robots/franka_panda_gripper_fixed_hard.urdf"
+    assetFileNameFranka: "urdf/franka_description/robots/franka_panda_gripper_Ubongo.urdf"
 
   # don't change
   aggregateMode: 3
