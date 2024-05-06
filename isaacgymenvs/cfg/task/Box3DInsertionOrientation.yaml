@@ -19,7 +19,7 @@ env:
   asset:
     use_env_v2: True
     assetRoot: "/robots/insertion_task/assets"
-    assetFileName: ${if:${task.env.asset.use_env_v2},urdf/Box3D/box3D_v2.urdf,urdf/Box3D/box3D.urdf}
+    assetFileName: ${if:${task.env.asset.use_env_v2},urdf/Box3D/box3D.urdf,urdf/Box3D/box3D.urdf}
     #assetFileName: "urdf/Box3D/box3D.urdf"
 
   maxEpisodeLength: 300

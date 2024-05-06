@@ -1,5 +1,5 @@
 # used to create the object
-name: InsertionPegHoleBox2D
+name: InsertionPegHoleBox3D
 
 physics_engine: ${..physics_engine}
 
@@ -13,16 +13,16 @@ env:
 
   asset:
     assetRoot: "../../assets"
-    assetFileNameHole: "urdf/Box2D/box2D.urdf"
-    assetFileNamePeg: "urdf/Box2D/peg.urdf"
+    assetFileNameHole: "urdf/Box3D/box3D.urdf"
+    assetFileNamePeg: "urdf/Box3D/peg.urdf"
 
-  n_taskpace_pos: 2  # 2 prismatic joints
-  n_taskpace_rot: 1  # 1 revolute joint
+  n_taskpace_pos: 3  # 3 prismatic joints
+  n_taskpace_rot: 3  # 3 revolute joints
 
   maxEpisodeLength: 30
 
-  initialPositionBounds: [[0.6, -0.5], [0.7, 0.5]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
-  initialRotationBounds: [[-0.79], [0.79]]  # If set, initial orientations will be sampled between [min, max], otherwise everywhere
+  initialPositionBounds: [[-0.5, -0.5, 0.3], [0.5, 0.5, 0.6]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
+  initialRotationBounds: [[-0.79, -0.79, -0.79], [0.79, 0.79, 0.79]]  # If set, initial orientations will be sampled between [min, max], otherwise everywhere
   useInitialStates: False  # If true, the initial states will be sampled from a list
   enableSparseReward: False  # If true, the reward will always be -1. Otherwise, the reward is a distance to the goal
   #  clipObservations: 1.0

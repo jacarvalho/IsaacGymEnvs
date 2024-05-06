@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="box3d_insertion">
+<robot name="peg">
 
   <link name="base">
     <visual>
@@ -12,123 +12,7 @@
     </visual>
   </link>
 
-<link name="table">
-    <visual>
-      <geometry>
-        <box size="2.0 2.0 0.05"/>
-      </geometry>
-      <material name="table">
-        <color rgba="0.9 0.9 0.9 1"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="2.0 2.0 0.05"/>
-      </geometry>
-      <contact_coefficients mu="0.5" kp="0." kd="0."/>
-    </collision>
-  </link>
-
-  <joint name="base_to_table" type="fixed">
-    <origin xyz="0 0 -0.125"/>
-    <parent link="base"/>
-    <child link="table"/>
-  </joint>
-
-
-  <link name="part1">
-    <visual>
-      <geometry>
-        <box size="2. 0.8725 0.2"/>
-      </geometry>
-      <material name="part1">
-        <color rgba="0.9 0.9 0.9 1"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="2. 0.8725 0.2"/>
-      </geometry>
-      <contact_coefficients mu="0.5" kp="0." kd="0."/>
-    </collision>
-  </link>
-
-  <joint name="base_to_part1" type="fixed">
-    <origin xyz="0 -0.56375 0"/>
-    <parent link="base"/>
-    <child link="part1"/>
-  </joint>
-
-  <link name="part2">
-    <visual>
-      <geometry>
-        <box size="2. 0.8725 0.2"/>
-      </geometry>
-      <material name="part1">
-        <color rgba="0.9 0.9 0.9 1"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="2. 0.8725 0.2"/>
-      </geometry>
-      <contact_coefficients mu="0.5" kp="0." kd="0."/>
-    </collision>
-  </link>
-
-  <joint name="base_to_part2" type="fixed">
-    <origin xyz="0 0.56375 0"/>
-    <parent link="base"/>
-    <child link="part2"/>
-  </joint>
-
-<link name="part3">
-    <visual>
-      <geometry>
-        <box size="0.8725 2. 0.2"/>
-      </geometry>
-      <material name="part1">
-        <color rgba="0.9 0.9 0.9 1"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="0.8725 2. 0.2"/>
-      </geometry>
-      <contact_coefficients mu="0.5" kp="0." kd="0."/>
-    </collision>
-  </link>
-
-  <joint name="base_to_part3" type="fixed">
-    <origin xyz="0.56375 0. 0"/>
-    <parent link="base"/>
-    <child link="part3"/>
-  </joint>
-
-<link name="part4">
-    <visual>
-      <geometry>
-        <box size="0.8725 2. 0.2"/>
-      </geometry>
-      <material name="part1">
-        <color rgba="0.9 0.9 0.9 1"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <box size="0.8725 2. 0.2"/>
-      </geometry>
-      <contact_coefficients mu="0.5" kp="0." kd="0."/>
-    </collision>
-  </link>
-
-  <joint name="base_to_part4" type="fixed">
-    <origin xyz="-0.56375 0. 0"/>
-    <parent link="base"/>
-    <child link="part4"/>
-  </joint>
-
-<link name="dummy">
+  <link name="dummy">
     <visual>
       <geometry>
         <box size="0.01 0.01 0.01"/>
@@ -209,7 +93,7 @@
   </link>
 
 
-   <link name="box">
+   <link name="ee">
     <visual>
       <geometry>
         <box size="0.25 0.25 0.25"/>
@@ -275,7 +159,7 @@
     <axis xyz="0 0 1"/>
     <origin xyz="0 0 0"/>
     <parent link="dummy5"/>
-    <child link="box"/>
+    <child link="ee"/>
     <limit effort="1.0" lower="-31.14159265359" upper="31.14159265359" velocity="0.3"/>
   </joint>
 

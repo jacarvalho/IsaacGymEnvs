@@ -208,7 +208,7 @@ class InsertionPegHole(VecTask):
         ############################
         # Impedance control stiffness and damping
         if self.control_type == 'osc':
-            self.kp_pos_factor = 500.
+            self.kp_pos_factor = 1000.
             self.kp_rot_factor = 100.
         elif self.control_type == 'ik':
             self.kp_pos_factor = 100.

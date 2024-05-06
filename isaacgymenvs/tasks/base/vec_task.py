@@ -296,8 +296,8 @@ class VecTask(Env):
                 # cam_pos = gymapi.Vec3(.35, 0.0, 0.2)
                 # cam_target = gymapi.Vec3(0.0, -0., 0.07)
 
-                cam_pos = gymapi.Vec3(0.8, 0.0, 3.0)
-                cam_target = gymapi.Vec3(0.81, 0., 0.01)
+                cam_pos = gymapi.Vec3(-3.5, 0.0, 3.0)
+                cam_target = gymapi.Vec3(1.5, 0., 0.1)
             else:
                 cam_pos = gymapi.Vec3(20.0, 3.0, 25.0)
 
