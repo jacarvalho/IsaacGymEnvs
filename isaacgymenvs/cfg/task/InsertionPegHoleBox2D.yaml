@@ -45,7 +45,7 @@ env:
   controlVelocity: False  # If false, IC controls the position. If true, control directly the velocity u = D*(dx_des - dx). If enabled, the controlFrequencyInv should be small
   learnRotations: False  # If false, the desired orientation is fixed. If true, is learned by the policy
   learnStiffness: False  # If true, the stiffness K_pos and K_orn is learned by the policy
-  justLearnStiffness: True  # If true, only the stiffness K_pos and K_orn is learned by the policy and not the delta position/orientation
+  justLearnStiffness: False  # If true, only the stiffness K_pos and K_orn is learned by the policy and not the delta position/orientation
 
   enableDebugVis: True
 
