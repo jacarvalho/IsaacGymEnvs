@@ -387,11 +387,10 @@ class VecTask(Env):
             # this is useful, e.g., for impedance control, where the policy sets the desired position and
             # the actual position is updated after each simulation step, so the torque command needs to be updated
             for i in range(self.control_freq_inv):
-                self.pre_physics_step(action_tensor, step=i)
+                self.pre_physics_step(action_tensor, step_controller=i)
+                if self.force_render:
+                    self.render()
                 self.gym.simulate(self.sim)
-            # render only after the last step
-            if self.force_render:
-                self.render()
         else:
             # apply actions
             self.pre_physics_step(action_tensor)

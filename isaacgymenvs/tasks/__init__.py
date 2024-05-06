@@ -48,7 +48,7 @@ from .allegro_hand import AllegroHand
 from .dextreme.allegro_hand_dextreme import AllegroHandDextremeManualDR, AllegroHandDextremeADR
 from .trifinger import Trifinger
 
-from .insertion_box2d import InsertionBox2D
+from .insertion_peg_hole import InsertionPegHole
 from .box3d_insertion_franka import FrankaBox3DInsertion
 from .box3d_insertion import Box3DInsertion
 from .ubongo_franka import FrankaUbongo
@@ -120,9 +120,10 @@ isaacgym_task_map = {
     "ShadowHand": ShadowHand,
     "Trifinger": Trifinger,
 
-    "InsertionBox2D": InsertionBox2D,
+    "InsertionPegHoleBox2D": InsertionPegHole,
+    "InsertionPegHoleBox3D": InsertionPegHole,
+    "InsertionPegHoleUbongo": InsertionPegHole,
+
     "FrankaBox3DInsertion": FrankaBox3DInsertion,
-    "Box3DInsertion": Box3DInsertion,
-    "UbongoInsertion": UbongoInsertion,
     "FrankaUbongo": FrankaUbongo
 }

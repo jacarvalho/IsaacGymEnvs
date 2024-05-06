@@ -6,9 +6,9 @@
       <geometry>
         <box size="0.01 0.01 0.01"/>
       </geometry>
-      <material name="box">
-        <color rgba="1. 0. 0. 1"/>
-      </material>
+<!--      <material name="box">-->
+<!--        <color rgba="1. 0. 0. 1"/>-->
+<!--      </material>-->
     </visual>
   </link>
 
@@ -17,9 +17,9 @@
       <geometry>
         <box size="0.01 0.01 0.01"/>
       </geometry>
-      <material name="box">
-        <color rgba="0. 1. 0. 1"/>
-      </material>
+<!--      <material name="box">-->
+<!--        <color rgba="0. 1. 0. 1"/>-->
+<!--      </material>-->
     </visual>
   </link>
 
@@ -28,9 +28,9 @@
       <geometry>
         <box size="0.01 0.01 0.01"/>
       </geometry>
-      <material name="dummy2">
-        <color rgba="0. 1. 0. 1"/>
-      </material>
+<!--      <material name="dummy2">-->
+<!--        <color rgba="0. 1. 0. 1"/>-->
+<!--      </material>-->
     </visual>
   </link>
 
@@ -69,7 +69,7 @@
     <inertial>
       <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
       <mass value="1."/>
-      <inertia ixx="0.00541667" ixy="0" ixz="0" iyy="0.02104167" iyz="0" izz="0.02604167"/>
+      <inertia ixx="0.00427083" ixy="0" ixz="0" iyy="0.00427083" iyz="0" izz="0.00520833"/>
     </inertial>
   </link>
 

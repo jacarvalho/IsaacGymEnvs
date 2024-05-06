@@ -1,5 +1,5 @@
 # used to create the object
-name: InsertionBox2D
+name: InsertionPegHoleBox2D
 
 physics_engine: ${..physics_engine}
 
@@ -8,7 +8,7 @@ env:
   numEnvs: ${resolve_default:100,${...num_envs}}
   envSpacing: 1.5
 
-  controlFrequencyInv: 3  # (1/(dt))/3 = 60/3 = 20Hz
+  controlFrequencyInv: 4  # (1/(dt))/4 = 60/4 = 15Hz
   recomputePrePhysicsStep: True
 
   asset:
@@ -16,29 +16,36 @@ env:
     assetFileNameHole: "urdf/Box2D/box2D.urdf"
     assetFileNamePeg: "urdf/Box2D/peg.urdf"
 
-  maxEpisodeLength: 1000
+  n_taskpace_pos: 2  # 2 prismatic joints
+  n_taskpace_rot: 1  # 1 revolute joint
 
-  initialPositionBounds: [[0.4, -0.5], [0.6, 0.5]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
+  maxEpisodeLength: 30
+
+  initialPositionBounds: [[0.6, -0.5], [0.7, 0.5]]  # If set, initial positions will be sampled between [min, max], otherwise everywhere
+  initialRotationBounds: [[-0.79], [0.79]]  # If set, initial orientations will be sampled between [min, max], otherwise everywhere
   useInitialStates: False  # If true, the initial states will be sampled from a list
   enableSparseReward: True  # If true, the reward will always be -1. Otherwise, the reward is a distance to the goal
+  #  clipObservations: 1.0
+  #  clipActions: 10.0
 
-  linear_velocity_norm_min: 0.
-  linear_velocity_norm_max: 0.05
-  angular_velocity_norm_min: 0.
-  angular_velocity_norm_max: 0.5
-#  clipObservations: 1.0
-#  clipActions: 10.0
+  # mininum and maximum deltas for the cartesian controller
+  delta_translation_min: -0.15
+  delta_translation_max: 0.15
+  delta_rotation_max: 0.3
 
-  enableVelocityState: False  # If true, uses linear and angular velocities in the state, along with the position
-  enableOrientations: True  # If true, includes the orientations as part of the state and controller
+  linear_velocity_min: -0.01
+  linear_velocity_max: 0.01
+  angular_velocity_min: -0.05
+  angular_velocity_max: 0.05
+
 
   # Low-level controller parameters
   enableNonimalPolicy: True  # If true, uses a PD controller to the goal as nominal policy.
-  useOSC: True  # If true, uses the Operational Space Control (OSC) controller. Otherwise, uses differential IK
-  controlVelocity: False  # If false, IC controls the position. If true, control directly the velocity u = K*(dx_des - dx) - D*ddx. If enabled, the controlFrequencyInv should be small
-  learnOrientations: False  # If false, the desired orientation is fixed. If true, is learned by the policy
-  learnStiffness: False
-  learnDamping: False
+  controlType: "osc"  # osc - Operational Space Control (OSC) controller. ik - differentiable IK
+  controlVelocity: False  # If false, IC controls the position. If true, control directly the velocity u = D*(dx_des - dx). If enabled, the controlFrequencyInv should be small
+  learnRotations: False  # If false, the desired orientation is fixed. If true, is learned by the policy
+  learnStiffness: False  # If true, the stiffness K_pos and K_orn is learned by the policy
+  justLearnStiffness: True  # If true, only the stiffness K_pos and K_orn is learned by the policy and not the delta position/orientation
 
   enableDebugVis: True
 
