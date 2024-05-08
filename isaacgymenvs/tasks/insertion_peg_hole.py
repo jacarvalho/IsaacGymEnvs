@@ -97,10 +97,10 @@ class InsertionPegHole(VecTask):
         # observations (and state)
         # All relative to the world frame
 
-        # 0:3 - box position
-        # 3:12 - box orientation
-        # 12:15 - box linear velocity
-        # 15:18 - box angular velocity
+        # 0:2 - box position
+        # 3:11 - box orientation
+        # 12:14 - box linear velocity
+        # 15:17 - box angular velocity
         self.cfg["env"]["numObservations"] = 3 + 9 + 3 + 3
 
         ############################
@@ -147,7 +147,7 @@ class InsertionPegHole(VecTask):
 
         ############################
         # low-level controller
-        self.enable_nominal_policy = self.cfg["env"].get("enableNonimalPolicy", False)
+        self.enable_nominal_policy = self.cfg["env"].get("enableNominalPolicy", False)
         self.control_type = self.cfg["env"]["controlType"]
         assert self.control_type in {"osc", "ik"}, "Invalid control type specified. Must be one of: {osc, ik}"
         self.control_vel = self.cfg["env"]["controlVelocity"]
@@ -185,6 +185,7 @@ class InsertionPegHole(VecTask):
         self.rb_state = gymtorch.wrap_tensor(rb_state_tensor)
 
         # buffer for jacobian of peg
+        # geometric jacobian in the world frame
         _jacobian = self.gym.acquire_jacobian_tensor(self.sim, "peg")
         jacobian = gymtorch.wrap_tensor(_jacobian)
         self._jacobian_ee = jacobian[:, self.peg_ee_index-1, :, :]
@@ -552,7 +553,9 @@ class InsertionPegHole(VecTask):
                 if self.enable_nominal_policy:
                     actions_pos_nominal_ = self.peg_pos_goal - peg_pos_cur  # vector pointing towards the goal
                     # clip the nominal signal, so that the actions are not too small in comparison to the nominal signal
-                    actions_pos_nominal = torch.clip(actions_pos_nominal_, self.delta_translation_min, self.delta_translation_max)
+                    # actions_pos_nominal = torch.clip(actions_pos_nominal_, self.delta_translation_min, self.delta_translation_max)
+                    actions_pos_nominal = actions_pos_nominal_
+                # combine the nominal and the learned policy
                 actions_pos_ = actions_pos_nominal + self.actions_pos_delta
                 # clip the delta in translation to make sure the target is within the bounds
                 actions_pos = torch.clip(actions_pos_, self.delta_translation_min, self.delta_translation_max)
@@ -571,13 +574,15 @@ class InsertionPegHole(VecTask):
             if step_controller == 0:
                 # update and fix the target at the beginning of the low-level control loop
                 actions_rot_delta = theseus.SO3.exp_map(self.actions_rot_delta)
-                if self.enable_nominal_policy:
+                if self.enable_nominal_policy or not self.learn_rotations:
                     # distance from current to the goal orientation
                     rot_nominal = self.peg_rot_goal.compose(peg_rot_cur.inverse())
                     # clip the nominal signal, so that the actions are not too small in comparison to the nominal signal
-                    rot_nominal = self.clip_rotation(rot_nominal)
+                    # rot_nominal = self.clip_rotation(rot_nominal)
+                    # combine the nominal and the learned policy
                     actions_rot_delta = actions_rot_delta.compose(rot_nominal)
-                self.peg_rot_target = actions_rot_delta.compose(peg_rot_cur)
+                # clip the delta in rotation to make sure the target is within the bounds
+                self.peg_rot_target = self.clip_rotation(actions_rot_delta.compose(peg_rot_cur))
             # update the error and clip it
             actions_rot_ = self.peg_rot_target.compose(peg_rot_cur.inverse())
             actions_rot = self.clip_rotation(actions_rot_)
